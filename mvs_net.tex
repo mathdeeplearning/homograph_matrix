@@ -1,0 +1,42 @@
+%-*- coding: UTF-8 -*-
+\documentclass[hpyerref,UTF8,a4paper,titlepage,12pt,oneside]{ctexbook}
+\usepackage{hyperref}
+\usepackage{geometry}
+\usepackage{xeCJK, fontspec, xunicode, xltxtra,ulem}
+\usepackage{amsthm}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{mathrsfs}
+\usepackage{mathtools}
+\usepackage{commath}
+\usepackage{listings}
+\usepackage{float}
+\usepackage{xcolor}
+\usepackage{mdframed}
+
+\graphicspath{{images/}}
+\geometry{a4paper,bottom=2cm}
+
+\title{MVSNet}
+\author{陈国庆}
+\date{\today}
+
+\bibliography{plain}
+
+% 定理结构
+\theoremstyle{definition}
+\newtheorem{definition}{定义}[section]
+\newtheorem{theorem}{定理}[section]
+\newtheorem{corollary}{推论}[theorem]
+\newtheorem{lemma}[theorem]{Lemma}
+\renewcommand\qedsymbol{$\blacksquare$}
+
+\begin{document}
+
+\maketitle
+% \tableofcontents
+
+
+
+\bibliography{math}
+\end{document}

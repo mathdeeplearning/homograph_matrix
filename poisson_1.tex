@@ -5,45 +5,63 @@
 
 因为遮挡及仪器精度问题，原始点云存在很多噪音，比如离群点、遮挡导致的空洞等，\textit{显式重建}会把噪音建模其中，而\textit{隐式重建}，通过隐函数处理此类问题，对噪音的处理及容忍度更高，效果也更好一些。\\
 
-\section{指示函数}
-常通过定义一个$3$值指示函数来区分模型内外的点，比如点在模型外，则函数值为$-1$；在内为$1$；在表面上，则为$0$；后续建模的主要工作便是学习出这个指示函数，从而确定模型表面。\\
+\textbf{泊松重建}（Poisson Surface Reconstruction\footnote{\url{https://hhoppe.com/poissonrecon.pdf}}）是隐式重建中效果最好的算法之一，其原文知识非常广泛，本文为原文中提到技术做一些详细的介绍。
 
-但本文使用的是一个$2$值指示函数$\mathbf{\chi}_M$：点在模型外为$0$，在模型内（包括表面）为$1$。
+\section{指示函数}
+
+\definition{模型极其表面} $M$为需要表面重建的模型，$\partial M$或$S$是$M$的表面，$\mathbf{n}$为$S$的\textit{外法向量}，$s \in S$为表面点，$s.\overrightarrow{N}$为$s$点的\textit{内法向量}。\\
+
+泊松重建定义一个指示函数来区分模型内外的点，
+$$
+	\mathbf{\chi}_M(q) = \left\lbrace 
+				\begin{aligned}
+					0&, &\quad q \notin M\\
+					1&, &\quad q \in M
+				\end{aligned} 
+			\right\rbrace
+$$
+
 \begin{figure}[H]
 		\begin{center}
 			\includegraphics[scale=0.8]{images/p1.png}
 		\end{center}
 \end{figure}
 
-指示函数$\mathbf{\chi}_M$是一个分段常值函数，在模型内外，梯度均为$0$，但在表面附近梯度为无穷大，并且梯度方向是表面点的\textit{内法向量}（多元函数，某点梯度即为该点法向）。\\
+$\mathbf{\chi}_M$是一个分段常值函数，其梯度在模型内外均为$0$，在表面附近为无穷大。\\
 
-这表明，指示函数与表面点之间存在对应关系。但表面点梯度不存在，导致指示函数无法被求解，通常通过与某个光滑函数$\tilde{F}$作卷积，构造一个新的指示函数$\tilde{\chi}$，新指示函数与表面点之间的关系，由如下引理描述：
+对多元函数而言，表面点梯度方向是其\textit{内法向量}，这建立了$\mathbf{\chi}_M$的梯度与表面点之间的关系。\\
 
+根据已知表面点极其法向，利用这种对应关系，计算出$\mathbf{\chi}_M$是一个自然的想法，也是隐式重建的主要工作。但因表面点梯度不存在，对应关系尚无法被准确刻画。\\
+
+将$\mathbf{\chi}_M$与某个光滑函数$\tilde{F}$作卷积，构造一个新的指示函数$\tilde{\chi} = \mathbf{\chi}_M * \tilde{F}$，$\tilde{\chi}$与表面点之间的关系，由如下引理刻画：
+
+\theorem{梯度与法向之间的积分关系}
 \begin{equation}
 	\nabla \tilde{\chi}(q_0) = \nabla(\chi_M * \tilde{F})(q_0) = \int_{\partial{M}}\tilde{F}_p(q_0)\overrightarrow{N}_{\partial{M}}(p)d_p \label{lemma_1}
 \end{equation}
 
 $\overrightarrow{N}_{\partial{M}}(p)$为$p$点的\textit{内法向量}。\\
 
-引理表明，指示函数与卷积核的梯度，等于卷积核与法向量在模型表面的积分，这是$\tilde{\chi}$与表面点法向之间的对应关系，原文中称为积分关系。\\
+引理表明，指示函数$\mathbf{\chi}_M$与卷积函数卷积的梯度，等于卷积核与法向量在模型表面的积分，原文中称为\textbf{积分关系}，此后将专注求解$\tilde{\chi}$。\\
 
-在证明这个结论之前，先复习一下\textbf{格林公式}/\textbf{散度定理}：\\
+在证明引理之前，先复习一下\textbf{格林公式}：
 
+\theorem{格林公式} \\
 
-$M$为模型，$S$为模型表面（等同于文中的$\partial M$），$\mathbf{n}$为$S$的\textit{外法向量}，$\mathbf{F}$为定义在$S$上的向量场，则\textbf{格林公式}/\textbf{散度定理}结论为，
+$\mathbf{F}$为定义在$S$上的向量场，其三个分量为$P(x,y,z), Q(x,y,z), R(x,y,z)$，
 $$
 \iint_{S}\mathbf{F}\cdot\mathbf{n} \text{ } d \mathbf{S} = \iiint_M \mathop{div} \mathbf{F} \text{ }  dV 
 $$
 
-其中，$P(x,y,z), Q(x,y,z), R(x,y,z)$为向量场$\mathbf{F}$对应的三个坐标函数，
-$$
+
+$
 div \mathbf{F} = \frac{\partial P}{\partial x} + \frac{\partial Q}{\partial y} + \frac{\partial R}{\partial z}
-$$
-为$\mathbf{F}$的散度。\\
+$
+，为$\mathbf{F}$的散度。\\
 
-\textbf{格林公式}/\textbf{散度定理}表明，向量场与法向的\textbf{面积分}等价于向量场散度的\textbf{体积分}。\\
+\textbf{格林公式}表明，向量场与法向的\textbf{面积分}等价于向量场散度的\textbf{体积分}。用\textbf{格林公式}来证明上述积分关系的定理，\\
 
-只要验证(\ref{lemma_1})式左侧$\tilde{\chi}$的梯度等于(\ref{lemma_1})式右侧，引理即可证明，
+\proof 只要验证(\ref{lemma_1})式左侧$\tilde{\chi}$的梯度等于(\ref{lemma_1})式右侧即可，
 
 \begin{align}
 	\frac{\partial}{\partial x}\bigg |_{q_0} (\chi_M * \tilde{F}) &= \frac{\partial}{\partial x}\bigg |_{q_0} \int_M \tilde{F}(q-p) \mathop{d}p \label{proof_1}\\
@@ -59,19 +77,31 @@ $$
 		\right>\mathop{d}p \label{proof_4}
 \end{align}
 
-上式只是对$x$进行求导，对$y,z$求导也可得出类似结论，从而引理得到证明。\\
+上式只是对$x$进行求导，对$y,z$求导也可得出类似结论，从而引理得到证明。\qedsymbol
+\\
 
 （\ref{proof_1}）是指示函数与卷积函数的卷积结果；（\ref{proof_2}）是将$\tilde{F}$对$q$的求导转换为对$p$的导数；（\ref{proof_3}）是将积分写为散度的形式；（\ref{proof_4}）是根据\textbf{格林公式}将体积分转变为面积分。
 
 \section{梯度场的求解}
 
-\subsection*{积分中值定理}
+\theorem {积分中值定理}\\
+
 	对函数$f(\mathbf{x})$在区域$\mathbf{D}$上的积分，存在某个$\mathbf{x}_0$，使得下式成立，
 	$$
 		\int_D f(\mathbf{x}) \mathop{d}\mathbf{x} = |\mathbf{D}|f(\mathbf{x}_0)
 	$$
 
-	$|\mathbf{D}|$是积分区域大小，若$f$为二元函数，$|\mathbf{D}|$为面积；为三元函数，则为体积。
+	$|\mathbf{D}|$是积分区域大小，若$f$为二元函数，$|\mathbf{D}|$为面积；为三元函数，则为体积。\\
+
+	$\mathbf{x}_0$只能定性分析，无法定量求解。在实际中常选用一个已知的$\mathbf{y}_0$来代替$\mathbf{x}_0$以方便计算，这样就只能得到近似值，下面马上会用到这种近似计算。\\
+
+\definition{向量场} \quad 向量场是定义在流形之上一个向量函数，在泊松重建中，模型表面$\partial M$是一个二维流形，$\tilde{\chi}$在$\partial M$上的每个点都存在一个梯度，这个梯度是一个三维向量，因此$\partial M$是一个向量场，或梯度场。\\
+
+\definition{旋度} \quad 旋度描述向量旋转强度，向量场沿闭合曲线一圈（积分）会产生一个环流量，比如旋转的水窝产生水流量，磁场产生电流；把闭合曲线缩小至一个点，则得到这个点的旋度，因为流形上的点有法向，所以旋度是个向量，这个方向是场旋转的环绕方向。\\
+
+如果向量场是一个力场，绕曲线一圈代表做功大小，我们知道是0，说力场是\textbf{无旋场}；同样，梯度场也是\textbf{无旋场}，但上面的磁场、水窝产生场都是\textbf{有旋场}。\\
+
+反过来，一个向量场如果不是\textbf{无旋场}，则一定不是梯度场；是\textbf{无旋场}也不一定是梯度场。
 
 \subsection*{梯度场近似计算}
 将$\partial M$划分为一些列互不相交的集合$\mathcal{P}_s$，在每个$\mathcal{P}_s$上，对积分进行求和，
@@ -81,7 +111,7 @@ $$
 	&\approx \sum_{s \in S}|\mathcal{P}_s|\tilde{F}_{s.p}s.\overrightarrow{N} \equiv \overrightarrow{V}(q) \label{vector_field}
 \end{align}
 
-第二步近似计算是用$p$点的值，代替了\textbf{积分中值定理}中某个确定点$p_0$的值。\\
+第二步近似计算是用$p$点的值，代替了\textbf{积分中值定理}中某个确定点$x_0$的值。\\
 
 $|\mathcal{P}_s|$为分割表面积，如果采样是均匀的，可以认为是一个常数，在计算中可以忽略；如果采样是非均匀的，则需自适应计算其大小，后边专门讨论。\\
 
@@ -91,30 +121,28 @@ $$
 \nabla \tilde{\chi} = \overrightarrow{V}
 $$
 
-$\nabla \tilde{\chi}$为$\tilde{\chi}$的梯度场，梯度场的特点是旋度(curl)为0，而$\overrightarrow{V}$为一般的向量场，一般来说旋度不为0，因此上述变分方程可能无解。
+$\nabla \tilde{\chi}$为$\tilde{\chi}$的梯度场，根据前面讨论$\overrightarrow{V}$为一般的向量场，一般来说旋度不为0，因此上述变分方程无解。
 
 \subsection*{泊松方程}
 
-对此可放宽条件，用最小二乘的思路，求与$\overrightarrow{V}$距离最小的解，距离可用下面的$L_2$范数定义，
+对此放宽条件，求与$\overrightarrow{V}$距离最小的解，距离用下面的$L_2$范数定义，
 
 $$
 	\mathop{L}(q) = \int \left(\nabla\tilde{\chi} - \overrightarrow{V}\right)^2 \mathop{d}p
 $$
 
-求解最小值时的变分，可得$\mathop{L}$最小时需满足，
+求解变分，可得$\mathop{L}$最小时的条件，
 $$
 	\nabla(\nabla \tilde{\chi}) = \nabla\overrightarrow{V} \Rightarrow \Delta \tilde{\chi} = \nabla\overrightarrow{V}
 $$
 
-这个方程称为\textit{泊松方程}，是一个非齐次二阶偏微分方程。将向量场的求解转变为泊松方程，在物理学中比较常见，所以原文中并未介绍泊松方程的过程。
+这个方程称为\textit{泊松方程}，是一个非齐次二阶偏微分方程，向量场的求解转变为泊松方程求解问题。
 
 \section{泊松方程求解}
 
 	泊松方程的直接求解依赖初值条件，这里无法准确建立模型的初值条件，所以无法获得解析解，转而寻求数值解。\\
 
-	为了求得数值解，需要将指示函数$\tilde{\chi}$和向量场$\overrightarrow{V}$在一组函数基下展开，只要确定在这组函数基下的系数便可准确刻画指示函数和向量场，如此泊松方程求解可简化为线性方程求解问题。\\
-
-	那应该在什么函数基下展开呢？
+	为了求得数值解，需要将指示函数$\tilde{\chi}$和向量场$\overrightarrow{V}$在一组函数基下展开，只要确定在这组函数基下的系数便可准确刻画指示函数和向量场，泊松方程求解可简化为线性方程求解问题。
 
 	\subsection{函数基}
 		通常可以把一个函数通过泰勒级数或傅里叶变换展开，而在小波变换中，常用小波基展开一个信号，傅里叶基与小波基是正交基，而泰勒基是幂函数，并非正交基。\\
@@ -123,7 +151,7 @@ $$
 
 		紧支撑使得函数基仅在支撑集上有定义，非支撑集上为0，从而形成\textbf{稀疏性}，具体计算时节省计算资源。
 
-	\subsection{函数基选择标准}
+	\subsection{函数基选择}
 		小波基是通过平移、缩放一个小波母函数而得到，因此小波可以做到多分辨分析，而傅里叶变换则做不到。实际上正是因为傅里叶变换做不到多分辨分析，才有了小波变换。\\
 
 		我们希望选择的函数基是紧支撑、稀疏的，在接近模型表面的地方分辨率更高一些，其他地方分辨率稀低一些，这样能更好的的为表面细节建模，同时又节省计算资源，因此文中选择了与小波基类似的函数基。
@@ -140,7 +168,7 @@ $$
 
 		那母函数$F$怎么选择呢？文中选择了方差为$o.w$的单位高斯函数，但高斯函数并不是紧支撑函数，不符合前面讨论的稀疏化的要求，所以通过\textbf{门函数}的$n$次卷积来代替高斯函数。
 
-		\subsubsection*{门函数}
+		\definition{门函数}
 			$$
 				B(t) = \left\lbrace 
 					\begin{aligned}
@@ -157,33 +185,32 @@ $$
 				F(x,y,z) = \left(B(x)B(y)B(z)\right)^{*n}
 			$$
 
-		\subsubsection*{随机变量和分布逼近高斯函数}
-
 			为什么门函数的$n$次卷积可以代替高斯函数？在概率论中有下面两个结论，
-			\begin{itemize}
-				\item $n$个独立同分布随机变量$X_i$和的分布等于$n$个分布的卷积，即：
+
+			\theorem{\textbf{随机变量和的分布}} \quad $n$个独立同分布随机变量$X_i$和的分布等于$n$个分布的卷积，即：
 				$$
 					p\left(\sum_{i=1}^nX_i\right) = p(X_1) * p(X_2) * \cdots * p(X_n)
 				$$
-				\item 根据中心极限定理，
+
+			\theorem{\textbf{中心极限定理}}\quad $\mu$，$\sigma^2$为独立同分布$\{X_i\}$的期望和方差，则
 				$$
 					\frac{\sum_{i=1}^nX_i - n\mu}{\sqrt{n}\sigma} \sim \mathcal{N}(0, 1)
 				$$
 
-				令$Y_n = \frac{\sum_{i=1}^nX_i - n\mu}{\sqrt{n}\sigma}$，当$n->\infty$时，服从标准正态分布，则
+				令$Y_n = \frac{\sum_{i=1}^nX_i - n\mu}{\sqrt{n}\sigma}$，当$n \rightarrow \infty$时，服从标准正态分布，则
 
 				$$
 					\sum_{i=1}^nX_i  = \sqrt{n}\sigma Y_n + n\mu
 				$$
 
-				近似服从$\mathcal{N}(n\mu, n\sigma^2)$的正态分布，考虑分布为门函数的场景，
+				近似服从$\mathcal{N}(n\mu, n\sigma^2)$的正态分布，考虑门函数的场景，
 
 				$$
 					\sum_{i=1}^nX_i \sim \mathcal{N}(0, n/12)
 				$$
 
-				$\sum_{i=1}^nX_i$近似服从$\mathcal{N}(0, n/12)$的正态分布，$n$越大越逼近正态分布，但方差也会越大，所以在本文中作者选择$n=3$
-			\end{itemize}
+				$\sum_{i=1}^nX_i$近似服从$\mathcal{N}(0, n/12)$的正态分布，$n$越大越逼近正态分布，但方差也会越大，所以在原文中作者选择$n=3$\\
+			
 
 			根据上面讨论，任何一个概率分布的$n$次卷积都可以逼近高斯函数，包括门函数。
 
@@ -212,36 +239,38 @@ $$
 			\end{figure}
 
 	\subsection{指示函数分解}
-		根据前面选定的函数基，就可以按（\ref{wavelet_func}）的方式将其进行平移、缩放，定义到八叉树的叶子的中心点上，对指示函数$\tilde{\chi}$，可以用该函数基进行分解，
+		根据前面选定的函数基$\{F_o\}$，就可以按（\ref{wavelet_func}）的方式将其进行平移、缩放，定义到八叉树的叶子的中心点上，对指示函数$\tilde{\chi}$，可以用$\{F_o\}$进行分解，
 
 		$$
 			\tilde{\chi}(q) = \sum_{o \in S} \alpha_{o} F_o(q)
 		$$
 
-		后续任务是求解出系数${\alpha_{o}}$，但这组函数基并非是正交基，无法像傅里叶变换和小波变换一样，通过积分简单计算其分量。
+		后续任务是求解出系数$\{\alpha_{o}\}$，$\{F_o\}$并非是正交基，无法像傅里叶变换和小波变换一样，通过积分简单计算其分量。
 
 	\subsection{向量场的分解}
-		在向量场（\ref{vector_field}）中的卷积函数与前面定义的函数基有什么关系？\\
 
-		基函数通过平移缩放到八叉树叶节点的中心，而向量场的样本点不一定在叶节点的中心上，因此可能被周边多个叶节点上的基函数所覆盖，所以样本点对应的值由邻居加权更为合理，这实际是高斯混合模型的思路，文中通过三线性插值确定分量系数。\\
-
-		文中取了周边最近的8个邻居作插值计算，向量场可分解为：
+		向量场的样本点被周边多个邻居节点上的基函数所覆盖，所以样本点对应的值由邻居加权更为合理， 文中通过8个邻居的三线性插值确定样本值，因此向量场（\ref{vector_field}）被分解为，
 
 		\begin{align}
 			\overrightarrow{V}(q) = \sum_{s \in S}\sum_{o \in {Ngbr}_D(s)} \alpha_{o,s}F_o(q)s.\overrightarrow{N}
 		\end{align}
 
-		系数${\alpha_{o,s}}$在插值过程中确定。\\
+		分量系数$\{\alpha_{o,s}\}$在插值过程中被确定，是已知量。\\
 
-		要注意的是\textit{向量场}不同于\textit{向量空间}，向量空间的基是一组线性无关的向量；\textit{向量场}是定义在流形之上的向量函数，需用函数基进行分解。\\
+		这实际是高斯混合模型的思路，通过混合多个高斯分布拟合样本，高斯混合通过期望最大化求解分量，而这里用插值确定分量。\\
 
-		另外，\textit{向量空间}的曲率为0，而\textit{向量场}的曲率一般不为0。
+		要注意的\textit{向量场}与\textit{向量空间}的区别，
+
+		\begin{itemize}
+			\item \textit{向量空间}维度是有限的，$n$维向量空间，用$n$个线性无关的基向量进行分解
+			\item \textit{向量场}是定义在流形之上的向量函数，维度是无限的，需用无穷维函数基进行分解
+		\end{itemize}
 
 
 	\subsection{求解Poisson方程}
 		我们将指示函数$\tilde{\chi}$与向量场$\overrightarrow{V}$用基函数展开，但$\Delta{\tilde{\chi}}$与$\nabla \overrightarrow{V}$是另外两个不同的函数，这两个函数是否需要在基函数上展开呢？\\
 
-		如果继续展开会导致待定系数过多，没有足够的条件求解，文中用一个折中而又巧妙的处理：只要这两个函数在基函数${F_o}$上的投影足够接近就行，
+		如果继续展开会导致待定系数过多，缺少足够的求解条件，文中作一个巧妙的处理：只要这两个函数在基函数$\{F_o\}$上的投影足够接近就行，
 
 		$$
 		\sum_{o \in \mathcal{O}}\left\Vert \Delta{\tilde{\chi}} - \nabla\cdot \overrightarrow{V}, F_o \right\Vert^2 
@@ -251,19 +280,19 @@ $$
 			\big<\nabla\cdot \overrightarrow{V}, F_o\big> \right\Vert^2
 		$$
 
-		这种巧妙处理本质是规避了去刻画两个函数绝对“接近”，而只是追求部分接近（投影），这种处理是否是well-defined呢？\\
+		处理本质是规避了去刻画两个函数绝对“接近”，而只是追求"部分"接近（投影），这种处理是否是well-defined呢？\\
 
-		衡量两个函数是否接近，依赖“接近”的度量方式，基函数空间$\{F_o\}$没有上明确定义度量(metric)方式，导致${F_o}$并非是一个度量空间，此处实际就是补充投影内积作为度量方式。\\
+		衡量两个函数是否接近，依赖“接近”的度量方式，基函数空间$\{F_o\}$没有上明确定义度量(metric)方式，导致$\{F_o\}$并不是一个度量空间，此处补充投影内积作为函数空间的度量。\\
 
-		通过内积定义的距离，不但是well-defined，很多时候还是完备的；这个定义虽然合理，但不一定最优，也可以尝试其他度量定义方式。\\
+		通过内积定义距离，不但well-defined，很多时候还是完备的；定义虽然合理，但不一定最优，也可尝试其他度量方式。\\
 
-		如此，Poisson问题可转变为一个最小二乘问题，
+		Poisson问题转变为一个最小二乘问题，
 
 		$$
 			\min_{x\in \mathbb{R}^{|\mathcal{O}|}} \left\Vert Lx - \nu\right\Vert
 		$$
 
-		其中，$L$是一个$|\mathcal{O}| \times |\mathcal{O}|$对称正定矩阵，其中每一项内容为，
+		其中，$L$是一个$|\mathcal{O}| \times |\mathcal{O}|$对称正定矩阵，其中每一项为，
 
 		$$
 			L_{o,o^{\prime}} = \left< \frac{\partial^2 F_o}{\partial x^2}, F_{o^{\prime}}\right>
@@ -276,7 +305,7 @@ $$
 \section{等值面抽取}
 	有了指示函数$\tilde{\chi}$就可以回答某个点在模型内外，	通过\textit{Marching Cubes}\footnote{\url{https://www.cs.carleton.edu/cs_comps/0405/shape/marching_cubes.html}}的方法，刻画出模型表面结构。\\
 
-	为了使用\textit{Marching Cubes}，首先需要构建一个等值(isovalue)，以此计算\textit{Marching Cubes}每个立方体8个顶点的等值，如果8个顶点的等值不相同，则等值面会穿过这个立方体，从而插值的方式构造立方体的切面来拟合出\textit{等值面}。\\
+	为了使用\textit{Marching Cubes}，首先需要构建一个等值(isovalue)，以此计算\textit{Marching Cubes}每个立方体8个顶点的等值，如果8个顶点的等值不相同，则等值面会穿过这个立方体，以插值的方式构造立方体的切面来拟合出\textit{等值面}。\\
 
 	一般用样本的均值来构建等值，文中也不例外，\textit{等值面}定义如下，
 
@@ -298,19 +327,18 @@ $$
 
 	最后一步，基函数平移缩放但保持积分不变。根据指示函数定义，这个等值实际就是模型表面的值，等值面就是模型表面。\\
 
-	那为啥不直接把等值定义为1呢？在算法计算过程中存在误差，使得计算值偏离理想值1，用实际计算结果会更加鲁棒。
+	那为啥不直接把等值定义为1呢？因为实际算过程中存在误差，使得计算值偏离1，用实际计算结果会更加鲁棒。
 
 \section{非均匀采样}
 	如果样本采样并非均匀分布，(\ref{vector_field})式中梯度场计算时，$|\mathcal{P}_s|$就不能再认为是常数，具体值需由该点的密度决定。\\
 
-	评估样本点的分布，通常用\textit{非参数估计}，或者更具体的\textit{核概率密度估计}，本文也是这个思路，给出下面的密度估计函数，
+	评估样本点的分布，通常用\textit{核概率密度估计\footnote{\url{https://www.zhihu.com/question/27301358/answer/105267357}}}，原文也是这个思路，给出下面的密度估计函数。对给定的深度$\hat{D} < D$，
 
-	对给定的深度$\hat{D} < D$，
 	$$
 		W_{\hat{D}}(q) \equiv \sum_{s \in S} \sum_{o \in {Ngbr}_{\hat{D}}(s)} \alpha_{o,s}F_o(q)
 	$$
 
-	还是通过卷积函数来模拟密度估计，这个方式实际与原始的\textit{核概率密度估计}差异较大，但一定程度上也可能刻画样本疏密程度。\\
+	实际是借用前面的卷积来模拟密度估计，这个方式实际与原始的\textit{核概率密度估计}差异较大，但一定程度上也可能刻画样本疏密程度。\\
 
 	基于新的密度评估函数，重写（\ref{vector_field}），
 	\begin{equation}
@@ -321,7 +349,7 @@ $$
 
 	具体来说，密度越大的地方用更大的深度（但不超过深度为$D$）；密度小的地方，用更小的深度；卷积核尺寸的变化体现在通过不同深度的邻居节点进行插值。\\
 
-	（\ref{vector_field_v2}）继续修改为，
+	继续完善（\ref{vector_field_v2}），
 
 	\begin{equation}
 		\overrightarrow{V}(q) = \sum_{s\in S}\frac{1}{W_{\hat{D}}(s.p)} \sum_{o \in {Ngbr}_{Depth(s.p)}(s)} \alpha_{o,s}F_o(q) \label{vector_field_v3}
@@ -333,9 +361,7 @@ $$
 		{Depth}(s.p) \equiv \min\left(D, D + \log_4\left(W_{\hat{D}(s.p)}/W\right)\right)
 	$$
 
-	$W$是平均采样密度。${Depth}(s.p)$会根据当前点的密度与平均密度自适应深度变化。\\
-
-	同样，等值面也需重写，
+	$W$是平均采样密度。${Depth}(s.p)$会根据当前点的密度与平均密度自适应深度变化。同样，等值面也需重写，
 
 	$$
 		\partial M \equiv \left\lbrace q \in \mathbb{R}^3 \mid \tilde{\chi}(q) = \gamma \right\rbrace
