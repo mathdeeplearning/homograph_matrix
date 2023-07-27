@@ -14,7 +14,7 @@
 \usepackage{xcolor}
 \usepackage{mdframed}
 
-\graphicspath{{images/}}
+\graphicspath{{../images/}}
 \geometry{a4paper,bottom=2cm}
 
 \title{MVSNet}
@@ -118,8 +118,8 @@
 
 	\begin{figure}[H]
 		\begin{center}
-			\includegraphics[width=0.48\textwidth]{images/pinhole.png}
-			\includegraphics[width=0.48\textwidth]{images/pinhole_coor.png}
+			\includegraphics[width=0.48\textwidth]{../images/pinhole.png}
+			\includegraphics[width=0.48\textwidth]{../images/pinhole_coor.png}
 		\end{center}
 		\caption{成像模型及相机坐标系}
 	\end{figure}
@@ -379,12 +379,12 @@
 			% \begin{center}
 			\begin{minipage}[t]{0.52\linewidth}
 				\centering
-				\includegraphics[width=0.8\textwidth]{images/origin_.jpeg}
+				\includegraphics[width=0.8\textwidth]{../images/origin_.jpeg}
 				\caption{墙面原图}
 			\end{minipage}
 			\begin{minipage}[t]{0.78\linewidth}
 				\centering
-				\includegraphics[width=0.8\textwidth]{images/projective_.png}
+				\includegraphics[width=0.8\textwidth]{../images/projective_.png}
 				\caption{射影变换，无穷远点被映射为有限点}
 			\end{minipage}			
 		\end{figure}
@@ -400,12 +400,12 @@
 		\begin{figure}[H]
 			\begin{minipage}[t]{0.52\linewidth}
 				\centering
-				\includegraphics[width=0.8\textwidth]{images/origin_.jpeg}
+				\includegraphics[width=0.8\textwidth]{../images/origin_.jpeg}
 				\caption{墙面原图}
 			\end{minipage}		
 			\begin{minipage}[t]{0.5\linewidth}
 				\centering
-				\includegraphics[width=0.8\textwidth]{images/affine_.jpeg}
+				\includegraphics[width=0.8\textwidth]{../images/affine_.jpeg}
 				\caption{仿射恢复，通过无穷远点消除射影失真}
 			\end{minipage}			
 		\end{figure}

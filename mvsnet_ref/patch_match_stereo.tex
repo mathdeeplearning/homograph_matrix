@@ -1,0 +1,192 @@
+\section{PatchMatch Stereo}
+
+传统的双目立体匹配计算视差时往往通过均值滤波取得某个点的视差，而
+\textbf{PatchMatch Stereo - Stereo Matching with Slanted Support Windows}\protect
+\footnote{\url{https://projet.liris.cnrs.fr/imagine/pub/proceedings/BMVC-2011/Paper_289/PatchMatchStereo_ExtentedAbstract.pdf}}是构建一个视差LR过程，将邻居点及视差匹配的其他视图的点作为样本，来学习LR对应的三个参数，因此效果比传统平均滤波更好。
+
+\subsection{双目立体匹配}
+传统的双面立体视觉估计包括几个步骤，
+\begin{enumerate}
+	\item 代价计算，具体就是衡量在两张图像上点对的匹配代价，代价可以是两点灰度绝对值差、绝对值和、归一化相关系数、互信息、Census变换、Rank变换等方法衡量；对匹配范围而已，主要是局部计算，可以点点计算，也可邻域匹配计算
+	\item 代价聚合，通过局部或者全局的方式进一步调优上一步的匹配代价
+		\begin{itemize}
+			\item 局部方法，通过\textbf{支撑窗口}做均值滤波，又分为固定窗和自适应窗
+			\item 全局方法，定义一个能量函数，最小化整体点点代价匹配，转化为一个优化问题
+		\end{itemize}
+	\item 视差计算，取代价最小的视差作为真值
+	\item 视差优化，手段包括提高精度，比如上图通过二次曲线拟合将视差整数值扩展到浮点值；剔除错误匹配、弱纹理优化、填补空洞等
+\end{enumerate}
+
+在代价计算和代价聚合的局部方法都可以借助一个窗口进行局部计算，代价聚合阶段的窗口命名为\textbf{support window}，这一过程主要就是在cost上作平均滤波，这也是一般窗口的常见操作。\\
+
+视差误差会平方放大深度误差，
+
+$$
+	\Delta d= -\frac{Bf}{D^2}\Delta D \Rightarrow \Delta D = -\frac{D^2}{Bf}\Delta d
+$$
+
+$d,D,B,f$分别为视差、深度、基线、焦距。\\
+
+所以评估视差时需要考虑到视差对噪音容忍程度低的特点，如果\textbf{support window}内的点都不在一个深度，则有不同的视差，平均滤波会增大这种误差。\\
+
+实际上，局部方法和全局方法都隐含了一个假设：\textit{窗内所有点的视差（深度）是相同的}。\\
+
+只有\textbf{fronto-parallel}平面才满足假设，但窗内的点可能处在不同的曲面上，也能处在\textbf{斜面}（非\textbf{fronto-parallel}）上，所以固定窗口的重建效果不理想。\\
+
+\textit{\textbf{fronto-parallel}是指，拍摄的场景是平面且平行于像平面。}\\
+
+代价计算阶段的平均滤波是否也存在这种隐形假设？实际是没有的，因为代价计算阶段图像滤波是对像素进行，只是为了刻画像素级别的相似性，像素的抗噪性更强，不存在放大深度误差的问题。\\
+
+本文开篇便提出\textbf{support window}的隐形假设，
+\begin{itemize}
+	\item 滤波器中心点的与周边点不在同一曲面上
+	\item 场景包含斜面
+\end{itemize}
+
+这两个假设与前面提到的假设是一致的，但作者认为上述问题发生在代价计算阶段，这显然是不准确的。
+
+\subsection{PatchMatch Stereo算法}
+
+作者认为窗内点不在一个曲面的问题通过自适应窗口诞生了很多的解决方案，但对场景中存在斜面的问题关注的并不多，因此他的主要方向是解决斜面下的\textbf{support window}。\\
+
+其主要思路是，
+\begin{itemize}
+	\item 为每一个点评估一个视差平面，基于此视差平面计算当前点的视差
+	\item 沿着平面法线方向优化视差，从而获得倾斜支持窗口的效果（\textbf{slants support window}）
+	\item 通过PatchMatch的方式寻找匹配关系
+\end{itemize}
+
+
+\subsubsection*{视差平面建模}
+
+$f_p$为$p$点对应的视差平面，$\mathbf{n}_p = (a_{f_p}, b_{f_p}, c_{f_p})^T$为$f_p$的法向量，则$p$点视差如下计算，
+
+\begin{equation}
+	d_p = a_{f_p}p_x + b_{f_p}p_y+c_{f_p}\label{disparity_eq}
+\end{equation}
+
+可用齐次坐标及内积表示为，
+
+$$
+	d_p = \mathbf{p}^T\cdot \mathbf{n}_p
+$$
+
+$\mathbf{p}=(p_x,p_y,1)^T$为$p$的二维齐次坐标，设相机内参矩阵为$\mathbf{K}$，$P = \mathbf{K}^{-1}\mathbf{p}$为$p$的反投影3D坐标，
+
+\begin{align*}
+		d_p &= \left(\mathbf{K}\mathbf{K}^{-1}\mathbf{p}\right)^T\cdot \mathbf{n}_p \\
+			& = P^T\mathbf{K}^T\cdot \mathbf{n}_p\\
+			&= P^T\cdot \left(\mathbf{K}^T \mathbf{n}_p\right)\\
+			&\overset{\triangle}{=}\mathbf{P}^T\cdot \mathbf{n}_p
+\end{align*}
+
+因为$\mathbf{K}$是常量，$\mathbf{n}_p$是需学习参数，所以$\mathbf{K}^T \mathbf{n}_p$仍用$\mathbf{n}_p$表示。\\
+
+整理一下可得，
+$$
+	\mathbf{n}_p^T P =d_p
+$$
+
+这是一个标准的平面$f_p$的方程，$f_p = (a_f,b_f,c_f,-d_p)^T$，且$p$的反投影在此平面上。\\
+
+文中称平面$f_p$为$p$点的\textbf{视差平面}，将平面截距定义为对应的视差，要注意这个平面不是场景在$P$点的切平面。\\
+
+过$P$点的平面很多，对应的截距也很多，所以接下来的任务是确定最优视差平面，因为平面一定要过$P$点，所以只要确定平面的法向量$\mathbf{n}_p$即可。\\
+
+文中给出如下优化目标，
+
+\begin{equation}
+	f_p = \underset{f\in \mathcal{F}}{\arg\min} \mathop{m}(p,f)\label{disparity_eq_opt}
+\end{equation}
+
+$\mathcal{F}$是平面全集，
+
+\begin{align*}
+	\mathop{m}(p,f) &= \sum_{q\in W_p} w(p,q)\cdot \rho\left(q,q-(a_{f}q_x + b_fq_y +c_f)\right) \\
+	&= \sum_{q\in W_p} w(p,q)\cdot \rho\left(q,q-d_q\right)\\
+	&= \sum_{q\in W_p} w(p,q)\cdot \rho\left(q,q^\prime\right)
+\end{align*}
+
+这实际就是视差局部匹配cost，$W_p$为$p$点的\textbf{support window}，$q^\prime$为$q$在目标图像上的对应点（二者通过视差平移），$w(p,q)$为自适应相似度权重，
+$$
+	w(p,q) = e^{-\frac{\Vert I_p - I_q\Vert}{\gamma}}
+$$
+
+$I_p,I_q$为RGB值，$\gamma$为人工参数，这个权重也比较简单。
+
+$$
+	\rho(q,q^\prime) = (1-\alpha)\cdot \min\left(\Vert I_p - I_q\Vert, \tau_{col}\right) + \alpha\cdot\min\left(\Vert\nabla I_q - \nabla I_{q^\prime} \Vert, \tau_{grad}\right)
+$$
+
+把RGB和梯度做双重惩罚，相当于引入RGB的一阶导数，也比较简单。
+
+（\ref{disparity_eq_opt}）的优化过程包括，
+
+\begin{itemize}
+	\item 计算权重$w(p,q)$，是一个自适应常数，与优化目标没有关系
+	\item 最小化$\rho(q,q^\prime)$，约束$q$与$q^\prime$的RGB及一阶导数相近
+\end{itemize}
+
+所以核心工作是寻找一组线性参数使得两个对应点（通过视差确定）之间的cost（RGB及梯度）最小。\\
+
+这与其他的双面立体匹配算法本质是一样的，不同的是把其他双目匹配的显式规则，转变为隐式参数，预估效果也要好一些。\\
+
+为什么可以用平面截距来表示视差呢？（\ref{disparity_eq}）本质是一个三参数线性回归问题，而三维空间的三参数又跟平面法向量一一对应，如果不用三参数回归或其他优化方法，就没这样的巧合。
+
+\subsubsection*{视差平面求解}
+	作者给出一些启发规则，并包括几个步骤，
+	\begin{enumerate}
+		\item \textbf{Random Initialization} 
+			\begin{itemize}
+				\item 随机初始化法向量，但不是直接随机取值，先取值一个视差范围内的$z_0$，对$p=(x_0,y_0)$，构成一个新坐标$P=(x_0,y_0,z_0)$；
+				\item 随机初始化单位法向量$\overset{\rightarrow}{\mathbf{n}} = (n_x,n_y,n_z)$，并计算
+				$$
+					a_f := -\frac{n_x}{n_z}, b_f := -\frac{n_y}{n_z}, c_f := -a_fx_0-b_fy_0+z_0
+				$$
+			\end{itemize}
+			前两步操作有点像齐次坐标转为二维坐标的意思，最后一步是方程（\ref{disparity_eq}）。\\
+
+			$(x_0,y_0,z_0)$是在二维坐标$(x_0,y_0)$后面加了$z_0$，是没有意义的坐标，正确的作法是通过$\mathbf{K}^{-1}$反投影$(x_0,y_0,z_0,1)$，再乘以尺度因子$z_0$
+		\item \textbf{Iteration} 主要进行下面几个传播过程，主要是寻找使得cost降低的$\mathbf{n}_p$
+			\begin{itemize}
+				\item \textbf{邻域内（Spatial Propagation）} 检查$p$领域内的$q$点确定的参数，能否使的$p$点的cost降低，如果可以，则采用$q$点的参数，即
+				$$
+					m(p,f_q) < m(p,f_p)
+				$$
+				则更新$f_p:=f_q$，可以把$q$看做样本，就是一个单点训练过程。
+
+				\item \textbf{对应图（View Propagation）} 这一步是应用两视图约束，如果右视图上$p$的对应点$p^\prime$的cost更低，则采用这组参数，相比第一步，相当于样本扩展到其他视图。
+
+				\item \textbf{固定位置（Temporal Propagation）} 这是对视频帧而言，不同帧相同位置做类似替换
+
+				\item \textbf{扰动方向（Plane Refinement）} 进一步调整参数，包括两部分，
+					\begin{itemize}
+						\item 扰动深度，根据实际场景对$z_0$估计一个区间$[-\Delta_{z_0}^{max}, \Delta_{z_0}^{max}]$，构造新点$P^\prime=(x_0,y_0,z_0^\prime)$
+
+						\item 扰动法向，对法向量也做类似限制$[-\Delta_{n}^{max}, \Delta_{n}^{max}]$
+
+						\item 迭代这个过程，看新参数是否使的cost降低；每迭代一次，区间长度折半
+					\end{itemize}
+			\end{itemize}
+
+			上面几个步骤迭代时顺序执行，且偶数次正序执行，从左上到右下，奇数次反序执行，后续有很多工作使得这个过程可以并行。
+
+		\item \textbf{后处理}，根据新参数生成的视差看是否满足左右约束，$|d_p - d_{p^\prime}| <1$，如果不满足，则找附近点的视差代替
+
+	\end{enumerate}
+
+	经过迭代得到视差平面，一般来说不再是\textbf{fronto-parallel}的，对应的窗口称为\textbf{slanted window}。
+
+\subsection{PatchMatch}
+
+\textbf{PatchMatch: A Randomized Correspondence Algorithm for Structural Image Editing}\protect\footnote{\url{https://gfx.cs.princeton.edu/pubs/Barnes_2009_PAR/patchmatch.pdf}}\\
+
+这是本文经常被提起的一篇文章，实际就是从两张图像中找相似patch，文中提出两个步骤：
+\begin{enumerate}
+	\item \textbf{Propgation} 如果某两个patch相似，则查找其左侧和下侧的patch
+	\item \textbf{Random Search} 如果某个patch相似，则小幅扰动坐标再查找一次
+\end{enumerate}
+
+这相比纯粹的随机搜索多了一些策略，计算性能也大幅提升；理论基础是图像是连续的，某个patch相似，则周边也可能相似。\\
+
+PatchMatch Stereo借助了PatchMatch的思想，传播过程比PatchMatch多了几个阶段，随机搜索过程则主要体现在后处理对法向和深度的扰动上。

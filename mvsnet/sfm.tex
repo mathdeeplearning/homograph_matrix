@@ -44,13 +44,13 @@
 			% \begin{center}
 			\begin{minipage}[t]{0.49\linewidth}
 				\centering
-				\includegraphics[width=\textwidth]{images/two_stereo.png}
+				\includegraphics[width=\textwidth]{../images/two_stereo.png}
 				\caption{平行视图}
 				\label{two_stereo}
 			\end{minipage}
 			\begin{minipage}[t]{0.49\linewidth}
 				\centering
-				\includegraphics[width=\textwidth]{images/two_stereo_depth.png}
+				\includegraphics[width=\textwidth]{../images/two_stereo_depth.png}
 				\caption{平行视图俯视几何}
 				\label{two_stereo_gemotry}
 			\end{minipage}			
@@ -69,7 +69,7 @@
 			对此需要将两个像平面修正为平行平面，此时极线才能真正构成\textbf{扫描线}，这个过程称为\textbf{极线校正}。具体来说，先把第二个平面的极点$e^\prime$变换到$(1,0,0)^T$，得到变换矩阵$H^\prime$；再利用投影误差最小化，得到第一个平面的变换矩阵$H$，如此可使得两极线对齐。具体细节请参考鲁鹏老师课程。
 			\begin{figure}[H]
 				\begin{center}
-					\includegraphics[width=0.8\textwidth]{images/epipolar.png}
+					\includegraphics[width=0.8\textwidth]{../images/epipolar.png}
 				\end{center}
 				\caption{极线校正}
 			\end{figure}
@@ -89,7 +89,7 @@
 
 			\begin{figure}[H]
 				\begin{center}
-					\includegraphics[width=0.85\textwidth]{images/matching_cost.jpeg}
+					\includegraphics[width=0.85\textwidth]{../images/matching_cost.jpeg}
 				\end{center}
 				\caption{Matching Cost \& 二次曲线修正\protect\footnote{\url{https://blog.csdn.net/rs_lys/article/details/83302323}}}
 			\end{figure}
@@ -222,7 +222,7 @@
 
 	\begin{figure}[H]
 		\begin{center}
-			\includegraphics[width=\textwidth]{images/ba.png}
+			\includegraphics[width=\textwidth]{../images/ba.png}
 		\end{center}
 		\caption{BA重投影误差}
 	\end{figure}
