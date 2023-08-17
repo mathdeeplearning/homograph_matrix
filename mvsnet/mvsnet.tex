@@ -248,9 +248,53 @@
 		\item Structure-from-Motion Revisited\footnote{\url{https://openaccess.thecvf.com/content_cvpr_2016/papers/Schonberger_Structure-From-Motion_Revisited_CVPR_2016_paper.pdf}}
 	\end{itemize}
 
-	后两篇文章是COLMap的基础，MVSNet也有间接参考。
+	后两篇文章是COLMap的基础，MVSNet也有间接参考；这几篇文章的详细解读在\textit{MVSNet References}中。
 
 \subsection{问题\&改进}
+	
+	\subsubsection*{R-MVSNet}
+		\textit{Recurrent MVSNet for High-resolution Multi-view Stereo Depth Inference}\footnote{\url{https://arxiv.org/abs/1902.10556}}这是原作者2019年对MVSNet进行改进的一篇文章，主要进行了下面几个改造，
+
+		\begin{itemize}
+			\item GRU代替3DCNN
+			\item 把Loss从回归改为二分类
+			\item 增加一个深度回归的过程，目的是提升深度亚像素精度，具体思路是计算像素点pair之间的相似性和反投影pair之间的相似性，
+			$$
+				E^i(p) =\mathcal{C}\left(\mathbf{I}_1(p),\mathbf{I}_{i\rightarrow1}(p)\right) + \sum_{p^\prime \in \mathcal{N}(p)}\mathcal{S}(p,p^\prime)
+			$$
+
+			第一项是从目标图像在深度D上反投影到参考图像得到$p^\prime_{i\rightarrow1}$，第二项像素平方约束，通过这个优化可以微调深度$D$得到亚像素深度精度。
+		\end{itemize}
+		
+		训练时，DTU数据集上，通过ColMap粗粒度点云获得深度区间；测试时，Tanks and Temples数据集上，通过OpenMVG来得到相机参数；再通过\textit{inverse depth setting}计算合适的采样点数量。\\
+
+		\textbf{spatial image resolution}是指参考图像上两个相邻点投影到目标图像后的$L_2$距离，比如$(W/2,H/2),(W/2+1,H/2)$这两个点，在参考图像上只差一个像素，对应目标图像上的$X_1,X_2$之间的差异，
+		$$
+			\rho = \Vert X_1 - X_2\Vert_2
+		$$
+
+		\textbf{temporal depth resolution}是这样一个采样距离，
+		$$
+			d(i) = 
+				\left(
+					\left(
+						\frac{1}{d_{min}} - \frac{1}{d_{max}}
+					\right)\frac{i}{D-1}
+					+ \frac{1}{d_{max}}
+				\right)^{-1}
+		$$
+
+		$i$是采样点的索引，$D$是采样数量，可知，$d(0) = d_{max},d(D-1) = d_{min}$。这式子用来描述采样点的深度，是一个双曲线；\textit{inverse depth setting}是指，
+		$$
+			\rho = d(2) - d(1)
+		$$
+
+		以此得到合适的采样点数$D$。\\
+
+		因为$d(i) - d(i+1) \ne d(j) - d(j+1)$，所以不清楚这个式子能work的意义在哪。\\
+
+		除了节省内存，建模效果没有显著提升；无论什么版本的MVSNet，Acc指标都低于传统方法Gipuma；Comp指标要高一些。
+
 	为什么要将场景切成192片，作单应变换去构建Cost，而不是直接通过基础矩阵变换构建Cost？\\
 
 	单应变换是传统处理常用的手段，这个文章发表比较早，受传统MVS影响比较大，可能当时还没有建立端到端的思路，或者是端到端没做出效果。\\

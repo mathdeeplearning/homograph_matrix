@@ -1,0 +1,16 @@
+\section{Pixelwise View Selection}
+
+\textbf{Pixelwise View Selection for Unstructured Multi-View Stereo}\footnote{\url{https://demuc.de/papers/schoenberger2016mvs.pdf}}，之所以看这篇文章是因为ColMap提到了，巧的是这篇文章与前一篇\textit{Joint View Selection}竟是同一批人，更巧的是ColMap的作者也是这批人。。。\\
+
+这篇完全使用上一篇提到的框架，主要新增了几个细节：
+\begin{itemize}
+	\item 在评估每个点的深度的时候，同时评估对应的法向量
+	\item 增加了patch之间相似度计算方式：两相机夹角、图像分辨率、法向夹角等；这些定义为隐变量，变成了联合分布的项
+	\item 同时提到使用\textit{slated window}作单应变换而非\textit{fronto-parallel}，具体怎么操作不得而知
+\end{itemize}
+
+实验部分，与前一篇风格一致，没有完整的对比实验，没有观察到显著效果。\\
+
+\section{SFM Revisited}
+
+\textbf{Structure-from-Motion Revisited}这篇也是ColMap参考过的，作者还是这批人。贡献了一些工程上的细节优化，这次有一些效果。

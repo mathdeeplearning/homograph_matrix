@@ -2,82 +2,85 @@
 
 传统的双目立体匹配计算视差时往往通过均值滤波取得某个点的视差，而
 \textbf{PatchMatch Stereo - Stereo Matching with Slanted Support Windows}\protect
-\footnote{\url{https://projet.liris.cnrs.fr/imagine/pub/proceedings/BMVC-2011/Paper_289/PatchMatchStereo_ExtentedAbstract.pdf}}是构建一个视差LR过程，将邻居点及视差匹配的其他视图的点作为样本，来学习LR对应的三个参数，因此效果比传统平均滤波更好。
+\footnote{\url{https://projet.liris.cnrs.fr/imagine/pub/proceedings/BMVC-2011/Paper_289/PatchMatchStereo_ExtentedAbstract.pdf}}构建LR过程，将邻居点及视差匹配的其他视图的点作为样本，学习LR对应的三个参数，因此效果好于传统均值滤波。
 
 \subsection{双目立体匹配}
-传统的双面立体视觉估计包括几个步骤，
+
+\begin{figure}[H]
+	\begin{center}
+		\includegraphics[width=\textwidth]{../images/disparty_constrain.png}
+	\end{center}
+	\caption{沿扫描线（极线）寻找匹配点}
+\end{figure}
+
+传统的双目立体匹配，沿着扫描线寻找某个点的最佳匹配，包括4个步骤，
 \begin{enumerate}
-	\item 代价计算，具体就是衡量在两张图像上点对的匹配代价，代价可以是两点灰度绝对值差、绝对值和、归一化相关系数、互信息、Census变换、Rank变换等方法衡量；对匹配范围而已，主要是局部计算，可以点点计算，也可邻域匹配计算
-	\item 代价聚合，通过局部或者全局的方式进一步调优上一步的匹配代价
+	\item 代价计算，衡量两张图像上点对的匹配代价，代价可通过两点灰度绝对值差、绝对值和、归一化相关系数、互信息、Census变换、Rank变换等方法衡量
+	\item 代价聚合，为降低单点对匹配带来的噪音，通过局部或者全局的方式优化匹配代价
 		\begin{itemize}
-			\item 局部方法，通过\textbf{支撑窗口}做均值滤波，又分为固定窗和自适应窗
-			\item 全局方法，定义一个能量函数，最小化整体点点代价匹配，转化为一个优化问题
+			\item 局部方法，在\textit{支撑窗口}做均值滤波，又分为\textit{固定窗}和\textit{自适应窗}
+			\item 全局方法，定义一能量函数，最小化整体点点代价匹配，转化为一个优化问题
 		\end{itemize}
 	\item 视差计算，取代价最小的视差作为真值
 	\item 视差优化，手段包括提高精度，比如上图通过二次曲线拟合将视差整数值扩展到浮点值；剔除错误匹配、弱纹理优化、填补空洞等
 \end{enumerate}
 
-在代价计算和代价聚合的局部方法都可以借助一个窗口进行局部计算，代价聚合阶段的窗口命名为\textbf{support window}，这一过程主要就是在cost上作平均滤波，这也是一般窗口的常见操作。\\
+在代价计算和代价聚合的局部方法都可以借助一个窗口进行局部计算，代价聚合阶段的窗口命名为\textit{\textbf{support window}}，主要操作便是在在窗口内对代价进行均值滤波。\\
 
-视差误差会平方放大深度误差，
+通过上图可知，对应窗口内所有点对的视差都是相同的，比如$(A,A^\prime),(B,B^\prime)$，因为它们的视差偏移量是相同的。\\
 
-$$
-	\Delta d= -\frac{Bf}{D^2}\Delta D \Rightarrow \Delta D = -\frac{D^2}{Bf}\Delta d
-$$
-
-$d,D,B,f$分别为视差、深度、基线、焦距。\\
-
-所以评估视差时需要考虑到视差对噪音容忍程度低的特点，如果\textbf{support window}内的点都不在一个深度，则有不同的视差，平均滤波会增大这种误差。\\
-
-实际上，局部方法和全局方法都隐含了一个假设：\textit{窗内所有点的视差（深度）是相同的}。\\
-
-只有\textbf{fronto-parallel}平面才满足假设，但窗内的点可能处在不同的曲面上，也能处在\textbf{斜面}（非\textbf{fronto-parallel}）上，所以固定窗口的重建效果不理想。\\
-
-\textit{\textbf{fronto-parallel}是指，拍摄的场景是平面且平行于像平面。}\\
-
-代价计算阶段的平均滤波是否也存在这种隐形假设？实际是没有的，因为代价计算阶段图像滤波是对像素进行，只是为了刻画像素级别的相似性，像素的抗噪性更强，不存在放大深度误差的问题。\\
-
-本文开篇便提出\textbf{support window}的隐形假设，
+因此，支持窗口本身隐含了窗口内的视差是个常量，或者说即深度是个常量，这显然是不合理的，文中开篇便给出反例，
 \begin{itemize}
-	\item 滤波器中心点的与周边点不在同一曲面上
-	\item 场景包含斜面
+	\item $A,B$在不同的曲面上
+	\item $A,B$处在斜面上
 \end{itemize}
 
-这两个假设与前面提到的假设是一致的，但作者认为上述问题发生在代价计算阶段，这显然是不准确的。
+反之当$A,B$具有不同深度的时候，也具有不同的视差，如果$(A,A^\prime)$是对应点对，那$(B,B^\prime)$不应该是对应点对，此时$(B,B^\prime)$的匹配代价会很高，会给基于窗口的均值操作会给代价聚合带来很高的的误差。
 
 \subsection{PatchMatch Stereo算法}
 
-作者认为窗内点不在一个曲面的问题通过自适应窗口诞生了很多的解决方案，但对场景中存在斜面的问题关注的并不多，因此他的主要方向是解决斜面下的\textbf{support window}。\\
+作者认为，窗内点在不同曲面的问题，可通过\textit{自适应窗口}解决，并且有很多解决方案；但点在斜面的问题关注的并不多，因此他提出\textit{slanted support window}来应该对该问题。\\
 
-其主要思路是，
-\begin{itemize}
-	\item 为每一个点评估一个视差平面，基于此视差平面计算当前点的视差
-	\item 沿着平面法线方向优化视差，从而获得倾斜支持窗口的效果（\textbf{slants support window}）
-	\item 通过PatchMatch的方式寻找匹配关系
-\end{itemize}
+那么，$A,B$在不同的曲面上与在相同斜面上有什么本质区别呢？我个人认为，区别是深度值的变化是否连续，斜面上点的深度变化连续，而不同曲面则不连续。\\
 
+不连续值通过RGB差异便可区分，因为不同深度的点，RGB不同的概率是很大的，所以作者说通过自适应窗口来解决；相反，连续值的RGB变化不明显，通过权重自适应的方法便不再有效。\\
+
+前面提到，\textit{support window}假设内部所有点的视差相同，\textit{slanted support window}则放开次约束；二者都是一个$w\times h$的2D像素窗口，区别就是每点视差是否相同。\\
+
+在基于流形的建模场景，会沿着场景表面构建局部邻域进行计算，比如人脸识别中的球面卷积，这种局部邻域不再是2D窗口。\textit{slanted support window}未拟合表面几何，仅在2D窗口中赋以不同的视差度量方式。\\
+
+\textit{slanted support window}中点的视差是通过评估\textit{视差平面}确定，视差变化是连续的，所以对应的视差平面最优解一定存在。
+
+\begin{figure}[H]
+	\begin{center}
+		\includegraphics[width=\textwidth]{../images/slanted_window.png}
+	\end{center}
+\end{figure}
+
+图(a)是\textit{support window}，窗口内所有点的视差值都相同；图(b)是\textit{slanted support window}，每个点的视差不同。
 
 \subsubsection*{视差平面建模}
 
-$f_p$为$p$点对应的视差平面，$\mathbf{n}_p = (a_{f_p}, b_{f_p}, c_{f_p})^T$为$f_p$的法向量，则$p$点视差如下计算，
+$f_p$为$p$点对应的视差平面，$\mathbf{n}_p = (a_{f_p}, b_{f_p}, c_{f_p})^T$为$f_p$的法向量，文中给出$p$点视差计算公式，
 
 \begin{equation}
 	d_p = a_{f_p}p_x + b_{f_p}p_y+c_{f_p}\label{disparity_eq}
 \end{equation}
 
-可用齐次坐标及内积表示为，
+只有两个变量$p_x,p_y$，怎么看都不是一个平面方程，这实际是像素平面上的直线方程，投影回三维空间才能看出等价的平面方程，具体操作如下：\\
+
+上式用齐次坐标及内积表示为，
 
 $$
 	d_p = \mathbf{p}^T\cdot \mathbf{n}_p
 $$
 
-$\mathbf{p}=(p_x,p_y,1)^T$为$p$的二维齐次坐标，设相机内参矩阵为$\mathbf{K}$，$P = \mathbf{K}^{-1}\mathbf{p}$为$p$的反投影3D坐标，
+$\mathbf{p}=(p_x,p_y,1)^T$为$p$的二维齐次坐标，相机内参矩阵为$\mathbf{K}$，$P = \mathbf{K}^{-1}\mathbf{p}$为$p$的3D坐标，
 
 \begin{align*}
 		d_p &= \left(\mathbf{K}\mathbf{K}^{-1}\mathbf{p}\right)^T\cdot \mathbf{n}_p \\
-			& = P^T\mathbf{K}^T\cdot \mathbf{n}_p\\
 			&= P^T\cdot \left(\mathbf{K}^T \mathbf{n}_p\right)\\
-			&\overset{\triangle}{=}\mathbf{P}^T\cdot \mathbf{n}_p
+			&\overset{\triangle}{=}P^T\cdot \mathbf{n}_p
 \end{align*}
 
 因为$\mathbf{K}$是常量，$\mathbf{n}_p$是需学习参数，所以$\mathbf{K}^T \mathbf{n}_p$仍用$\mathbf{n}_p$表示。\\
@@ -87,13 +90,11 @@ $$
 	\mathbf{n}_p^T P =d_p
 $$
 
-这是一个标准的平面$f_p$的方程，$f_p = (a_f,b_f,c_f,-d_p)^T$，且$p$的反投影在此平面上。\\
+这才是$p$点的\textbf{\textit{视差平面}}方程，$f_p = (a_f,b_f,c_f,-d_p)^T$，视差$d_p$是该平面的截距。
 
-文中称平面$f_p$为$p$点的\textbf{视差平面}，将平面截距定义为对应的视差，要注意这个平面不是场景在$P$点的切平面。\\
+\subsubsection*{视差平面计算}
 
-过$P$点的平面很多，对应的截距也很多，所以接下来的任务是确定最优视差平面，因为平面一定要过$P$点，所以只要确定平面的法向量$\mathbf{n}_p$即可。\\
-
-文中给出如下优化目标，
+视差平面过$P$点，所以只要确定法向量$\mathbf{n}_p$，平面便可被唯一确定，文中给出如下优化目标，
 
 \begin{equation}
 	f_p = \underset{f\in \mathcal{F}}{\arg\min} \mathop{m}(p,f)\label{disparity_eq_opt}
@@ -107,34 +108,27 @@ $\mathcal{F}$是平面全集，
 	&= \sum_{q\in W_p} w(p,q)\cdot \rho\left(q,q^\prime\right)
 \end{align*}
 
-这实际就是视差局部匹配cost，$W_p$为$p$点的\textbf{support window}，$q^\prime$为$q$在目标图像上的对应点（二者通过视差平移），$w(p,q)$为自适应相似度权重，
+这就是反复提到的在支持窗内对代价做均值，以提升单点代价匹配的抗噪性。\\
+
+$W_p$为$p$点的\textbf{support window}，$q^\prime$为$q$在目标图像上的对应点（二者通过视差平移），$w(p,q)$为自适应相似度权重，
 $$
 	w(p,q) = e^{-\frac{\Vert I_p - I_q\Vert}{\gamma}}
 $$
 
-$I_p,I_q$为RGB值，$\gamma$为人工参数，这个权重也比较简单。
+$I_p,I_q$为RGB值，$\gamma$为超参数；
 
 $$
 	\rho(q,q^\prime) = (1-\alpha)\cdot \min\left(\Vert I_p - I_q\Vert, \tau_{col}\right) + \alpha\cdot\min\left(\Vert\nabla I_q - \nabla I_{q^\prime} \Vert, \tau_{grad}\right)
 $$
 
-把RGB和梯度做双重惩罚，相当于引入RGB的一阶导数，也比较简单。
+为点对匹配代价，通过RGB和梯度相似度来定义，$\mathop{m}(p,f)$则为支持窗内的加权匹配代价。\\
 
-（\ref{disparity_eq_opt}）的优化过程包括，
+权重$w(p,q)$是一个自适应常数，与优化目标无关，所以优化的主要工作是最小化$q$与$q^\prime$之间的匹配代价，只要每个点的视差达到最优值，则匹配代价也会达到最小，这转变为线性回归问题。\\
 
-\begin{itemize}
-	\item 计算权重$w(p,q)$，是一个自适应常数，与优化目标没有关系
-	\item 最小化$\rho(q,q^\prime)$，约束$q$与$q^\prime$的RGB及一阶导数相近
-\end{itemize}
-
-所以核心工作是寻找一组线性参数使得两个对应点（通过视差确定）之间的cost（RGB及梯度）最小。\\
-
-这与其他的双面立体匹配算法本质是一样的，不同的是把其他双目匹配的显式规则，转变为隐式参数，预估效果也要好一些。\\
-
-为什么可以用平面截距来表示视差呢？（\ref{disparity_eq}）本质是一个三参数线性回归问题，而三维空间的三参数又跟平面法向量一一对应，如果不用三参数回归或其他优化方法，就没这样的巧合。
+此时若有标注样本，简单训练便可得到三个参数。样本是没有的，作者通过一些启发式规则迭代求解上面3个参数。
 
 \subsubsection*{视差平面求解}
-	作者给出一些启发规则，并包括几个步骤，
+	作者给出一些启发规则，及迭代步骤，
 	\begin{enumerate}
 		\item \textbf{Random Initialization} 
 			\begin{itemize}
@@ -175,7 +169,7 @@ $$
 
 	\end{enumerate}
 
-	经过迭代得到视差平面，一般来说不再是\textbf{fronto-parallel}的，对应的窗口称为\textbf{slanted window}。
+\textit{客观上不存在视差平面，本质上作者定义了一个三参数线性回归拟合每个点的视差；而三维空间的三个参数跟平面一一对应，如此便有了视差平面这一概念；若不是三参数回归或用其他优化方法，就没这样的可解释性。}
 
 \subsection{PatchMatch}
 

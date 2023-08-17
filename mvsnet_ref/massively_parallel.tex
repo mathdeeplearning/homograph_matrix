@@ -1,6 +1,6 @@
 \section{Gipuma}
 
-\textbf{Massively Parallel Multiview Stereopsis by Surface Normal Diffusion}\footnote{\url{https://www.cv-foundation.org/openaccess/content_iccv_2015/papers/Galliani_Massively_Parallel_Multiview_ICCV_2015_paper.pdf}} 这个文章主要在PatchMatch Stereo基础上解决了两个问题：
+\textbf{Massively Parallel Multiview Stereopsis by Surface Normal Diffusion}\footnote{\url{https://www.cv-foundation.org/openaccess/content_iccv_2015/papers/Galliani_Massively_Parallel_Multiview_ICCV_2015_paper.pdf}} 这个文章主要在PatchMatch Stereo基础上解决了两个问题（Github\footnote{\url{https://github.com/kysucix/gipuma}}）：
 
 \begin{itemize}
 	\item 使得PatchMatch Stereo可以并行计算
@@ -98,4 +98,4 @@ $$
 	\item 检测当前点的法向量变化是否在某个阈值内（30°）
 \end{itemize}
 
-Gipuma虽然是在PatchMatch Stereo基础上的工作，但无论是计算性能还是建模效果都表现非常不错。
+Gipuma虽然是在PatchMatch Stereo基础上的工作，但无论是计算性能还是建模效果都表现非常不错，后续文献也表面，在DTU数据集上，很少有算法能超过Gipuma的Accuracy指标，包括一些深度学习算法，并且差距还不小。

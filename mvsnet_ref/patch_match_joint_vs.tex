@@ -1,0 +1,294 @@
+\section{Joint View Selection}
+
+\textbf{PatchMatch Based Joint View Selection and Depthmap Estimation}\footnote{\url{https://openaccess.thecvf.com/content_cvpr_2014/papers/Zheng_PatchMatch_Based_Joint_2014_CVPR_paper.pdf}} 是CVPR2014的一篇文章，主要是思路是通过变分推断来求解多视图视觉问题。\\
+
+
+前面的文章主要针对\textit{双目视觉}，包括两部分工作，
+\begin{itemize}
+	\item 根据参考图(reference image)确定几张目标图（source images），主要是参考一些规则，比如基线远近灯
+	\item 图像通过极线校正后，计算每个点的视差，这里面又分几个步骤；关于局部计算的窗口，上文又提出了\textbf{slanted window}，同时会用PathcMatch的方法传播这个窗口计算以降低计算量
+\end{itemize}
+
+
+本文与此不同的是，针对\textit{多视图视觉}，对应两个部分为，
+\begin{itemize}
+	\item source images的选择（称为\textbf{view selection}）集成进算法迭代过程，不再是一个独立的过程
+	\item 通过变分推断同时求解出每个点的深度和对应的source images
+\end{itemize}
+
+整体来说将基于各种规则的视差计算问题，转化为概率分布，再通过变分推断进行求解。
+
+\subsection{模型假设}
+
+参考图$X^{ref}$上的点p，对应的支持窗$X_p^{ref}$，经过单应变换到目标图像$X^m$对应的支持窗$X^m_p$，那么$X^m_p$“可见度”有多大呢？\\
+
+如果$p$点在相机$m$中被遮挡了，$X^m_p$实际是不可见的，即使$p$没有被遮挡，但相机$m$与参考相机的视角较大，导致$X^m_p$与$X_p^{ref}$像素差异已经非常大，则也认为$X^m_p$的可见度很小。\\
+
+所以“可见度”也可认为目标窗口与参考窗口之间的某种相似度，比如传统MVS里面的RGB相似度。\\
+
+支持窗口是一个\textbf{fronto-parallel}平面，不同深度的$X_p^{ref}$变换得到的$X^m_p$是不同的，也就是说$X^m_p$也是$p$反投影深度$d$的函数。\\
+
+本文作者所用符号异于常人，
+
+\begin{itemize}
+	\item $l$代表$p$点坐标，意义是某行中的第$l$列，但把行给省略了，$X_l^{ref} = X_p^{ref}$
+	\item $\theta_l$代表$p$点反投影深度
+	\item $Z_l^m \in\{0,1\}$是一个指示变量，代表点$p$是否在$X^m$中可见
+\end{itemize}
+
+给出下面的“可见度”定义，
+
+\begin{equation}
+	P\left(X_l^m\mid Z_l^m, \theta_l,X_l^{ref} \right) = 
+	\begin{cases}
+		\frac{1}{NA}\exp{-\frac{\left(1-\rho^m_l\right)^2}{2\sigma^2}}\quad& \text{if } Z_l^m=1\\
+		\frac{1}{N}\mathcal{U}\quad & \text{if } Z_l^m=0
+	\end{cases}\label{patch_similar}
+\end{equation}
+
+$\rho^m_l$用NCC（normalized cross correlation）定义了两个窗口之间的RGB相似度，实际就是相关系数。这个文章没有代码，无法得知具体实现方式。\\
+
+$NA$是归一化系数，$N$是某个常数，$\sigma$也是超参数，$\mathcal{U}$是一个均值为0.5的均匀分布。\\
+
+该定义的意义是，如果$p$点在相机$m$中可见，则目标窗口的可见性由$\rho\left(m,l,\theta_l\right)$来定义；否则，若不可见，则可见性是一个常数。\\
+
+既然$p$都不可见了，为什么$X_l^m$可见性不是$0$而是一个常数呢？实际上，作为$0$是没有问题的，作者没有想清楚这个概率的实际意义是啥。\\
+
+$X^{ref}_l$属于已知量，$P\left(X_l^m\mid Z_l^m, \theta_l,X_l^{ref} \right)$也记为，$P\left(X_l^m\mid Z_l^m, \theta_l\right)$，$Z_l,\theta_l$称为\textbf{隐变量}，它们影响着目标窗口可见度，但又无法在样本中观察到。\\
+
+给定一张参考图像和$M$张目标图像$\mathbf{X}=\{X^1,\dots,X^m\}$，$\boldsymbol{\theta}=\{\theta_l|l=1,\dots,L\}, \mathbf{Z}=\{Z^m|m=1,\dots,M\}$，最大化后验分布$P(\mathbf{Z},\boldsymbol{\theta}|\mathbf{X})$，便可得到$\mathbf{Z},\boldsymbol{\theta}$，从而预估出参考图像的深度图。\\
+
+引入$Z^m_l$变量是一个非常创新性想法，无需事前对目标图像进行筛选，其全部可纳入迭代过程。\\
+
+当匹配窗口时，按照PatchMatch的方式进行，即计算完第$l-1$个点，顺序进行第$l$个点的匹配，对同一目标相机，前后两点对应窗口的可见性$Z_{l-1}^m,Z^m_l$是有一定关系的，如果不考虑更远的点对当前点的影响，这个过程构成马尔科夫链。\\
+
+本文的思路是通过\textbf{变分推断}结合\textbf{隐马尔科夫链}来求解这个MAP问题，这里还需讨论假设是否合理，怎么定义隐变量等问题。
+
+\subsection{期望最大化}
+
+	对分布$p(\mathbf{x},\mathbf{z};\theta)$，$\mathbf{z}$为隐变量，$\theta$为参数，最大化后验概率（MAP）等价与最大化似然函数，对应的优化目标为
+
+	$$
+		\mathop{Loss}(\theta) = \sum_{i}\log\sum_{z_i} p(x_i|z_i;\theta)p(z_i;\theta)
+	$$
+
+	对这种带隐变量的问题，直接对$\mathop{Loss}$求导解出$\theta$几乎是不可能的事，通常通过EM算法来优化该函数的下界，来达到最终优化$\mathop{Loss}(\theta)$的目的。\\
+
+	构造隐变量的中间分布$q_i$（$\sum q_i(z_i) = 1$），则
+
+	\begin{align}
+		\mathop{Loss}(\theta) 
+		&= \sum_i\log\sum_{z_i}p(x_i,z_i;\theta)\\
+		&= \sum_i\log\sum_{z_i} Q_i(z_i) \frac{p(x_i,z_j;\theta)}{Q_i(z_i)}\\
+		&\geq \sum_i\sum_j Q_i(z_i) \log\frac{p(x_i,z_i;\theta)}{Q_i(z_i)}\\
+		&= \mathcal{L}(\theta)
+	\end{align}
+
+	倒数第二步，$\log$是凹函数，通过Jensen不等式可得。\\
+
+	\begin{equation}
+		\mathcal{L}(\theta) = \sum_i\sum_{z_i} Q_i(z_i) \log\frac{p(x_i,z_i;\theta)}{Q_i(z_i)}
+	\end{equation}\label{ELBO}
+
+	为$\mathop{Loss}(\theta)$的下界。
+
+	\subsubsection*{E-Step}
+		选择什么样的$Q_i$才能使得下界更紧？Jensen不等式成立的条件是，
+		$$
+			\frac{p(x_i,z_i;\theta)}{Q_i(z_i)} = c
+		$$
+
+		所以
+		$$
+			p(x_i,z_i;\theta) = c Q_i(z_i)
+		$$
+
+		两边对$z$求和，并结合条件$\sum_{z_i} Q_i(z_i) = 1$，可知
+
+		$$
+			c = \sum_{z_i} p(x_i,z_i;\theta) = p(x_i;\theta)
+		$$
+
+		所以，
+		\begin{align}
+			Q_i(z_i) = \frac{p(x_i,z_i;\theta)}{p(x_i;\theta)} = p(z_i|x_i;\theta)
+		\end{align}\label{e_step}
+
+		所以，使得下界最紧的$Q_i$是$x_i$对中$z_i$的后验分布。
+	\subsubsection*{M-Step}
+		利用E-Step得到的$Q_i$，最大化$\mathcal{L}(\theta)$来得到参数$\theta$，第$t+1$次迭代，
+
+		\begin{align}
+			\theta^{(t+1)} &= \arg\max_\theta \mathcal{L}(\theta)\\
+				&= \arg\max_\theta \sum_i \sum_{z_i} p(z_i|x_i;\theta^{(t)})\log p(x_i,z_i;\theta)\\
+				&= \arg\max_\theta \sum_i \sum_{z_i} p(z_i|x_i;\theta^{(t)})\log p(x_i|z_i;\theta)p(z_i;\theta)\label{theta_eq}\\
+		\end{align}
+
+		第二步是将E-Step得到的$Q_i$（\ref{e_step}）代入（\ref{ELBO}）。$p(z_i|x_i;\theta^{(t)})$可表示为，
+
+		$$
+			p(z_i|x_i) = \frac{p(x_i|z_i)p(z_i)}{\sum_i p(x_i|z_i)p(z_i)}
+		$$
+
+		在解决具体问题是，只要明确$p(z_i;\theta),p(x_i|z_i;\theta)$的形式便可迭代求解。
+
+\subsection{EM求解MVS}
+		在本文中，$\mathbf{Z}= (Z^m|m=1,\dots,M)$为隐变量，$\theta = (\theta_1,\dots,\theta_L)$为参数；\\
+
+		$Z^m = (Z^m_1,\dots,Z^m_L)$是一个$L$维的随机向量，$L$为图像像素数量。\\
+
+	\subsubsection*{求解隐变量$Z^m$}
+
+		根据（\ref{e_step}），
+		$$
+			Q_i(Z^m) = p(Z^m|X^m;\theta) \propto p(X^m|Z^m;\theta)p(Z^m;\theta)
+		$$
+
+		根据假设$Z^m_l$的状态转移构成了马尔科夫链，
+
+		\begin{equation}
+			p(Z^m) = p(Z^m_1)\prod_{l=2}^L p(Z^m_l|Z^m_{l-1})\label{markov_chain}
+		\end{equation}
+
+		状态转移矩阵为，
+		$$
+			p(Z^m_l|Z^m_{l-1}) = \begin{bmatrix}
+				\gamma\quad & 1-\gamma\\
+				1-\gamma\quad & \gamma
+			\end{bmatrix}
+		$$
+
+		$\gamma=0.999$为超参数。
+
+		\begin{equation}
+			p(X^m|Z^m;\theta) = \prod_{l=1}^L p(X^m_l|Z^m_l;\theta_l)\label{first_expand}
+		\end{equation}
+
+		结合（\ref{markov_chain}）、（\ref{first_expand}）可得$q^*(Z^m)$为，
+
+		\begin{equation}
+			\boxed{
+			q^{opt}_m(Z^m) \propto  p(Z^m_1)\prod_{l=2}^L p(Z^m_l|Z^m_{l-1})  \prod_{l=1}^L p(X^m_l|Z^m_l;\theta_l)
+			}\label{q_z_eq}
+		\end{equation}
+
+		这与原文中的结论是一致的。
+
+	\subsubsection*{求解参数$\theta$}
+
+		根据文中假设，
+
+		\begin{itemize}
+			\item $p(Z^1)$为均匀分布，与参数$\theta$无关；
+			\item 状态转移矩阵$p(Z^m_l|Z^m_{l-1})$与参数$\theta$无关；
+			\item 由（\ref{markov_chain}），$p(Z^m)$与参数$\theta$无关；
+		\end{itemize}
+
+		原文是最小化KL距离，等价与最大化$\mathcal{L}(\theta)$，与M-Step的结果（\ref{theta_eq}）一致，
+
+		\begin{align*}
+			\theta^{(t+1)} &= \arg\max_\theta \sum_i \sum_{z_i} p(z_i|x_i;\theta^{(t)})\log p(x_i|z_i;\theta)p(z_i;\theta)\\
+			&= \arg\max_\theta \sum_i \sum_{z_i} Q_i(z_i;\theta^{(t)})\log p(x_i|z_i;\theta)p(z_i;\theta)\\
+			&= \arg\max_\theta \sum_{m=1}^M \sum_{Z^m} q^*_m(Z^m;\theta^{(t)})\log p(X^m|Z^m;\theta)p(Z^m)\\
+			&= \arg\max_\theta \sum_{m=1}^M \sum_{Z^m} q^*_m(Z^m;\theta^{(t)})\log p(X^m|Z^m;\theta)\\
+			&= \arg\max_\theta \sum_{m=1}^M \sum_{Z^m_l} 
+				\left[ 
+					\prod_{l=1}^L q^*_m(Z^m_l;\theta^{(t)}_l)\sum_{l=1}^L\log p(X^m_l|Z^m_l;\theta_l)
+				\right]
+		\end{align*}	
+
+		考虑第$l$个参数，
+
+		\begin{align}
+			\theta^{(t+1)}_l 
+			&=\arg\max_\theta \sum_{m=1}^M \sum_{Z^m} 
+			\left[ 
+				\prod_{l=1}^L q^*_m(Z^m_l;\theta^{(t)}_l) \right]\cdot
+				\log p(X^m_l|Z^m_l;\theta_l)
+			\\
+			&=\arg\max_\theta \sum_{m=1}^M 
+				\left[
+					\prod_{l=1}^L q^*_m(Z^m_l=1;\theta^{(t)}_l)
+				\right]\log p(X^m_l|Z^m_l=1;\theta_l)\label{em_theta}
+		\end{align}
+
+		对比一下原文中的结论，
+
+		\begin{equation}
+			\theta^{opt}_l = \arg\max_{\theta^*_l}\sum_{m=1}^Mq(Z^m_l = 1)\ln P(X^m_l|Z^m_l=1,\theta_l=\theta^*_l)
+		\end{equation}
+		
+		二者差异是第一项图片$m$的权重，我们是$\prod_{l=1}^L q^*_m(Z^m_l=1;\theta^{(t)}_l)$，原文是$q(Z^m_l = 1)$。我们推导并无问题，原文结果是错误的。\\
+
+		猜测作者的结果参考\textit{混合高斯}模型，在\textit{混合高斯}中，隐变量$z_i$是单变量，对应上述结果；而在MVS场景，$z_i$是多变量，对应我们得结果。\\
+
+		$p(X^m_l|Z^m_l=1;\theta_l)$在（\ref{patch_similar}）被定义，代入可得
+
+		\begin{equation}
+		\boxed{
+			\theta^{(t+1)}_l = \arg\min_\theta \sum_{m=1}^M\left[
+					\prod_{l=1}^L q^*_m(Z^m_l=1;\theta^{(t)}_l)
+				\right]\left(1- \rho_l^m\right)^2
+				}\label{correct_theta}
+		\end{equation}
+
+		也不同于原文结果，
+		\begin{equation}
+			\theta^{opt}_l = \arg\min_\theta \sum_{m=1}^M q(Z^m_l=1)\left(1- \rho_l^m\right)^2 \label{paper_theta}
+		\end{equation}
+
+		后面基于采样计算$\theta^{opt}_l$自然也就不再正确。
+
+	\subsubsection*{HMM假设}
+
+		如前讨论，对图片$m$，本文假设$p(Z^m_l|Z^m_{l-1})$构成隐马尔科夫链，看一下对应的要素，
+
+		\begin{itemize}
+			\item 隐变量为$Z^m_l$，对应的状态集合$Q=\{0,1\}$
+			\item 转移矩阵A，前面已定义
+			\item 观测状态为$p(X^m_l|Z^m_l;\theta)$，观测集合$O = \{p(X^m_l|Z^m_l;\theta)\}$（$l=1,\dots,L$），观测状态是一个概率，并非是一个离散值
+			\item 观测矩阵B，观测状态不可数，无法定义
+			\item 初始向量$\pi$，可随机初始化
+		\end{itemize}
+
+		因为无法定义观测矩阵，所以这并不是一个well-defined的隐马模型。\\
+
+		well-defined的HMM模型，对确定的观测序列，可通过前向后向算法来求解某时刻下的状态概率，但这依赖观测矩阵B，若B无法定义，则算法无法执行。\\
+
+		行文至此，作者突然提出要通过前后向算法计算$q(Z^m)$，并给出如下式子，
+
+		\begin{align*}
+			q(Z_l) &= \frac{1}{A}\alpha(Z_{l})\beta(Z_l)\\
+			\alpha(Z_{l}) &= p(X_l|Z_l,\theta_l)\sum_{Z_{l-1}}\alpha(Z_{l-1})P(Z_l|Z_{l-1})\\
+			\beta(Z_l) &= \sum_{Z_{l+1}}\beta(Z_{l+1})P(X_{l+1}|Z_{l+1},\theta_{l+1})P(Z_{l+1}|Z_l)
+		\end{align*}
+
+		作者可能犯了几个错，
+		\begin{enumerate}
+			\item $p(Z_l)$是马尔科夫链，$q(Z_l)$并不是，作者可能迷糊了
+			\item $q(Z_l)$已经在（\ref{q_z_eq}）求解出来了
+			\item 作者误把$P(X_{l+1}|Z_{l+1},\theta_{l+1})$当作B，进行了前后向计算，这实际是观测状态
+		\end{enumerate}
+
+	\subsubsection*{HMM是否需要}
+
+		非well-defined的HMM，能否通过EM求解？\\
+
+		通过EM算法求解混合高斯时，需要\textbf{Mean-Field}假设，即隐变量相互独立；但本文中，做的是\textbf{马尔科夫依赖}假设，即隐变量只依赖前一状态，并非完全独立。\\
+
+		无论作何种假设，目的都是为了求解隐变量的联合分布，通过马尔科夫依赖也足以求解，是不是马尔科夫链并不重要。\\
+
+		更无需关注某个状态在观测序列中的概率，也不需去执行前后向算法。\\
+
+		确定$q^{opt}_m(Z^m), q^{opt}_l(\theta_l)$的具体形式，便可以执行E-M算法。
+	
+\subsection{合理性\&实验效果}
+
+	从实验部分看，缺少跟大多数算法的全面比对，在小数据集上效果也不明显，也没有给出实现代码，上文提到的各种问题也无法知道具体编码中是怎样处理。\\
+
+	理论部分缺少细节且存一些严重的问题，在HMM部分甚至有乱写倾向。\\
+
+	我们无法了解内部代码的实现方式，但做不出效果感觉也在情理之中。\\
+
+	此文开始提到他们用变分推断求解，我花费大量时间通过变分推断去推导结果，最终发现他们实际用的是EM算法。
+
