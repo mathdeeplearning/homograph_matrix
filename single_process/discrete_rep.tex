@@ -13,15 +13,22 @@
 	\end{equation}
 \end{theorem}
 
+分两步证明，
+
+\begin{enumerate}
+	\item 将$\hat{f}$作傅里叶级数展开（需要$\hat{f}$紧支撑）
+	\item 作$\hat{f}$的逆变换得到$f$
+\end{enumerate}
+
 \begin{proof}
-	$\hat{f}$定义域是$[-B,B]$，因此可周期延拓到整个实数轴上。系数$c_n$（\ref{f_series_form1}），
+	$\hat{f}$支撑集是$[-B,B]$，周期延拓后作傅里叶展开，分量系数为（\ref{f_series_form1}），
 	\[
 		c_n = \frac{1}{2B} \int_{-B}^B \hat{f}(x) e^{\frac{i2\pi  n x}{2B}}dx = \frac{1}{2B}f\left(\frac{-n}{2B}\right)
 	\]
 	
-	对应的傅里叶技术展开为，
+	对应的傅里叶级数，
 	\begin{equation*}
-		\hat{f}(\omega) = \sum_{n \in \mathbb{Z}}\frac{1}{2B}f\left(\frac{n}{2B}\right)e^{\frac{-i2\pi  n \omega}{2B}} \quad\left(x \in [-B,B]\right)
+		\hat{f}(\omega) = \sum_{n \in \mathbb{Z}}\frac{1}{2B}f\left(\frac{n}{2B}\right)e^{\frac{-i2\pi  n \omega}{2B}}
 	\end{equation*}
 
 	通过窗函数把定义域扩展到$(-\infty,\infty)$，
@@ -35,27 +42,29 @@
 	结合傅里叶变换的性质：
 	\begin{itemize}
 		\item 周期性：$f(-x) = \mathcal{F}(\hat{f})(x)$
-		\item 窗函数变换到sinc函数：$\hat{\chi}_{[-B,B]}= 2B\mathop{sinc}(2Bx)$
+		\item 窗函数对应sinc函数：$\hat{\chi}_{[-B,B]}= 2B\mathop{sinc}(2Bx)$
 		\item 旋转对应平移：乘以$e^{\frac{-i2\pi  n \omega}{2B}}$等价平移$-\frac{n}{2B}$
 	\end{itemize}
 
 	对（\ref{eq:freq_series}）两边做傅里叶变换可得（\ref{shannon_th}）。
 \end{proof}
 
-	Shannon采样定理表明，$f(x)$可以用$\mathop{sinc}$函数基分解，系数为离散采样点；对比傅里叶级数，用正余弦函数基分解，系数为积分值。\\
-
-	一般函数基分解出的系数，都有基本身有关，而$\mathop{sinc}$函数基产生的系数竟然与基本身无关，这真是一个令人吃惊的结论。
+采样定理表明，$f(x)$可以用$\mathop{sinc}$函数基分解，系数为离散采样点，来自傅里叶级数展开。
 
 \subsection{Nyquist采样频率}
 	
-	用任意的Nyquist频率$B_0$采样，按（\ref{eq:freq_series}）的方式得到，
+	用任意的Nyquist频率$B_0$替换（\ref{eq:freq_series}）中的$B$，得到频谱$\hat{h}$，
 	$$
 		\hat{h}(\omega) = \sum_{n \in \mathbb{Z}}\frac{1}{2B_0}f\left(\frac{n}{2B_0}\right)
 		\chi_{[-B_0,B_0]}(\omega)
 		e^{\frac{-i2\pi  n \omega}{2B_0}}
 	$$
 
-	\textbf{1、$B_0 < B$}， 对任意$|\omega| \in [B_0,B]$，都有$\hat{h}(\omega) =0 \ne \hat{f}(\omega)$，此时$\hat{h}$无法重建出$f(x)$\\
+	现在的问题是，$\hat{h}$对应的信号$h$与原始信号$f$有什么关系？\\
+
+	下面按$B_0$与$B$的关系讨论一下，\\
+
+	\textbf{1、$B_0 < B$}， 对任意$|\omega| \in [B_0,B]$，都有$\hat{h}(\omega) =0 \ne \hat{f}(\omega)$，此时$\hat{h}$一定无法重建出$f(x)$\\
 
 	\textbf{2、$B_0 > B$}，扩展$\hat{f}$的支撑集到$[-B_0,B_0]$，构建函数$\tilde{h}$，
 	$$
@@ -66,17 +75,17 @@
 	\begin{align*}
 		c_n
 			&= \frac{1}{2B_0}\int_{-B_0}^{B_0} \chi_{[-B_0,B_0]}\hat{f}(x) e^{\frac{i2\pi nx}{2B_0}}dx\\
-			&= \frac{1}{2B_0}\int_{-B_0}^{B_0} \chi_{[-B,B]}\hat{f}(x) e^{\frac{i2\pi nx}{2B_0}}dx\\
+			&= \frac{1}{2B_0}\int_{-B}^{B} \chi_{[-B,B]}\hat{f}(x) e^{\frac{i2\pi nx}{2B_0}}dx\\
 			&= \frac{1}{2B_0}\int_{-B}^{B} \hat{f}(x) e^{\frac{i2\pi nx}{2B_0}}dx\\
 			&= \frac{1}{2B_0}f\left(\frac{n}{2B_0}\right)
 	\end{align*}
 
-	对比可知，$\hat{h} = \tilde{h}$，$\hat{h}$是$\hat{f}$支撑集扩大到$[-B_0,B_0]$后的傅里叶级数。\\
+	对比可知，$\hat{h} = \tilde{h}$，所以$\hat{h}$是$\hat{f}$支撑集扩大到$[-B_0,B_0]$后的傅里叶级数，这表明函数傅里叶级数的分解不是唯一的。\\
 
 	$\hat{h}$的逆变换，根据周期性，
 
 	\begin{align*}
-		h(-x) &= \mathcal{F}(\hat{h})(\omega) 
+		h(-x) &= \mathcal{F}(\hat{h})(x) 
 			= \left(\int_{-B_0}^{-B} + \int_{-B}^{B} + \int_{B}^{B_0} \right)
 			\chi_{[-B,B]}\hat{f}(\omega) e^{-i2\pi \omega x}d\omega
 			 = f(-x)
@@ -91,17 +100,15 @@
 		\item 频域空间，高采样频率只是扩展了频谱支撑集，对频谱重建\underline{\textit{没有}}帮助
 	\end{itemize}
 	
-	时域与频域是同构，在频域没有帮助的操作，对应到时域就是冗余计算。\\
+	时域与频域是同构，在频域没有帮助的操作，对应到时域就是冗余计算。在工程实践中，信号存在噪音、丢失等情况，更密集的采样有助于平滑这些异常值。\\
 
-	当然在具体实现时，因为信号存在噪音、丢失等情况，更密集的采样有助于平滑这些异常值。\\
-
-	一般不知道信号的最高频率，经常根据经验估一个采样频率，估低了高频信息会丢失，无法准确重建；估高了又会造成冗余计算，这是一个权衡的过程。
+	一般无法知道信号的最高频率，经常根据经验估一个采样频率，估低了高频信息会丢失，无法准确重建；估高了又会造成冗余计算，这是一个权衡的过程。
 
 \subsection{sinc正交基}
 	
 	Shannon采样定理（\ref{th:discret_rep}）揭示了一个深刻的结论：对频域有\textit{紧支撑}的连续函数，可以sinc函数基分解，分量是原函数的离散值。\\
 
-	实际上sinc函数基是标准正交基，下面是证明过程。\\
+	这里要说明的是，sinc函数基是标准正交基，是非常理想的函数坐标系。\\
 
 	注意一个通过傅里叶变换计算积分的技巧，
 	$$
@@ -127,18 +134,22 @@
 		\end{aligned}
 	$$
 
-	在\textit{有限维线性空间}中，经常选择不同的基向量作为坐标系，两个坐标系之间存在一个\textit{线性变换}，通常用一个矩阵表示。\\
+	进一步，函数可以展开为某个\textit{核函数}$\psi$的级数（$T$为采样周期），
+	$$
+		f(x) = \sum_{n\in \mathbb{Z}}f(nT)\psi(ax-nT) 
+	$$	
 
-	在\textit{无限维函数空间}中，也经常选择不同的函数基作为坐标系，比如傅里叶基、sinc基、多项式基及小波基等，这些坐标系之间存在某种\textit{非线性变换}，并没有统一的表示方式，这是函数空间比线性空间复杂的地方。\\
-
-	通过不同的基函数，能观察到函数不同的性质，
+	除了sinc函数，核函数还有很多的选择，比如高斯函数、各类小波基函数。不同的基函数，能观察到函数（信号）不同的性质，
+	
 	\begin{itemize}
 		\item 傅里叶基，能观察到信号频率的构成情况；
 		\item sinc函数基，能观察到函数通过离散点重建的过程；
 		\item 小波基，能观察到随观察尺度变化的函数响应
 	\end{itemize}
 
-	机器学习中的核心工作可总结为数据降维，实际就是以数据驱动的方式学习出合适的坐标系。这种坐标系只是以神经网络的形式而存在，无法解析刻画，与前面提到的各种基函数坐标系是完全不同的。
+	\textit{向量空间}不同的向量基之间存在一个\textit{线性变换}，常用矩阵表示；\textit{函数空间}的函数基之间虽然也存在某种\textit{非线性}变换，但却没有统一的表示形式。\\
+
+	另外，机器学习的核心工作是数据降维，实际就是以数据驱动的方式学习出合适的坐标系，但坐标系是以网络参数的形式存在，无法形式化分析，这种不可解释的黑盒坐标系，在实际任务中却表现的很好。
 	
 
 
