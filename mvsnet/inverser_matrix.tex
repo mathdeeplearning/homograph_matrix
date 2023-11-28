@@ -1,0 +1,86 @@
+\subsection{反称矩阵}
+ 	向量$\mathbf{u},\mathbf{v}$的叉乘，
+ 	\begin{align*}
+ 		\mathbf{u}\times \mathbf{v} &= 
+ 		\begin{vmatrix}
+ 			\mathbf{i}\quad & \mathbf{j}\quad & \mathbf{k}\\
+ 			u_1\quad& u_2\quad& u_3\\
+ 			v_1\quad& v_2\quad& v_3
+ 		\end{vmatrix}\\
+ 		&= (u_2v_3 -u_3v_2)\mathbf{i} + (u_3v_1 - u_1v_3)\mathbf{j} +(u_1v_2 - u_2v_1)\mathbf{k}\\
+ 		&=\begin{bmatrix}
+ 			0 \quad& -u_3\quad & u_2\\
+ 			u_3\quad & 0\quad& -u_1\\
+ 			-u_2\quad& u_1\quad& 0
+ 		\end{bmatrix}
+ 		\begin{bmatrix}
+ 			v_1\\
+ 			v_2\\
+ 			v_3
+ 		\end{bmatrix}
+ 		\\
+ 		&= [\mathbf{u}]_{\times} \cdot \mathbf{v}
+ 	\end{align*}
+
+ 	$[\mathbf{u}]_{\times}$为由$\mathbf{u}$张成的\textbf{反称矩阵}，
+ 	$$
+ 		[\mathbf{u}]_{\times} = 
+ 		\begin{bmatrix}
+ 			0 \quad& -u_3\quad & u_2\\
+ 			u_3\quad & 0\quad& -u_1\\
+ 			-u_2\quad& u_1\quad& 0
+ 		\end{bmatrix}
+ 	$$
+
+	存在如下性质，
+
+	\begin{itemize}
+		\item 对任意向量$p$，$p^T [\mathbf{u}]_{\times} p = 0$
+		\item 矩阵秩为2，特征值为和纯虚数；所以基础矩阵秩为2
+		\item 二次幂可展开为，
+			$$
+				[\mathbf{u}]_{\times}^2 = \mathbf{u}\mathbf{u}^T - \Vert\mathbf{u}\Vert^2 \mathbf{I_3}
+			$$
+		\item 三次幂等价于自身，
+			$$
+				[\mathbf{u}]_{\times}^3 = -\Vert\mathbf{u}\Vert^2[\mathbf{u}]_{\times}
+			$$
+		\item 正交分解，
+			$$
+				[\mathbf{u}]_{\times} = kUZU^T
+			$$
+
+			$U$是单位正交矩阵，$k$是一个尺度因子，$\mathbf{u}$如果是齐次坐标，可以忽略；$Z$为，
+			$$
+				Z = \begin{bmatrix}
+					0 \quad& 1\quad& 0\\
+					-1 \quad& 0\quad& 0\\
+					0 \quad& 0\quad& 0
+				\end{bmatrix}
+				\quad
+				 W = \begin{bmatrix}
+					0 \quad& -1\quad& 0\\
+					1 \quad& 0\quad& 0\\
+					0 \quad& 0\quad& 1
+				\end{bmatrix}
+			$$
+
+			是一个反称矩阵，\textbf{忽略正负号}时，可用$W$表示为，
+			$$
+				Z = diag(1,1,0)W = diag(1,1,0)W^T
+			$$
+
+			得到用$W$表示$[\mathbf{u}]_{\times}$的两种形式（差一个尺度，包括正负号），
+			\begin{align}
+				[\mathbf{u}]_{\times} &= UZU^T \label{inverse_decompose}\\
+				&= U diag(1,1,0)WU^T\\
+				&= U diag(1,1,0)W^TU^T
+			\end{align}
+
+			注意$[\mathbf{u}]_{\times}$是齐次矩阵，忽略了尺度$k$。
+
+		\item 对任意向量$\mathbf{t}$和非奇异矩阵$\mathbf{M}$，
+			\begin{equation}
+				[\mathbf{t}]_{\times}\mathbf{M} = \mathbf{M}^{-T}\left[\mathbf{M}^{-1}\mathbf{t}\right]_{\times} \label {inver_m_p}
+			\end{equation}
+	\end{itemize}

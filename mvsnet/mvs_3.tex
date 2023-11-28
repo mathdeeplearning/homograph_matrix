@@ -11,9 +11,12 @@
 		\item $K,K^{\prime}$是两个相机的内参矩阵
 		\item $R,T$是第二个相机相对第一个相机的旋转和平移
 		\item $[T]_{\times}$是$T$张成的反称矩阵，秩为$2$
-		\item $e,e^\prime$为极点，$e^\prime$是$e$的投影，存在
+		\item $e,e^\prime$为极点，$e^\prime$是$e$及原点$(0,0,0)$的投影，存在
 			$$
-				e^\prime =K^\prime T
+				e^\prime = K^\prime[R \quad T]\begin{bmatrix}
+					\mathbf{0}\\
+					1
+				\end{bmatrix} = K^\prime T
 			$$	
 	\end{itemize}
 
@@ -80,6 +83,81 @@
 
 		$[T]_{\times},[e^\prime]_{\times}$的秩为2，所以$F$的秩也为2。\\
 
+	\subsection*{基础矩阵求解}
+		基础矩阵$F$有$7$个自由度，这个点可以从两方面看出，
+		\begin{itemize}
+			\item \textbf{直接法}，内参矩阵$K,K^\prime$已知，平移向量$T$有3个自由度，旋转矩阵$R$有4个自由度（绕某轴转某角），所以总共7个自由度
+			\item \textbf{间接法}，$F$是$3\times 3$矩阵，总共9个变量，一消去个不重要的尺度因子，所以总共8个变量；考虑秩为2，再消去一个变量，所以总共7个自由度
+		\end{itemize}
+
+		令$p=[x_1,x_2,1]^T,p^\prime = [x_1^\prime,x_2^\prime,1]$，
+
+		\begin{equation}
+			{p^{\prime}}^T \mathbf{F} p = 0
+		\end{equation}
+
+		可整理成，
+		$$
+			a\cdot f = 0
+		$$
+
+		\begin{align*}
+			a &= [x_1^\prime x_2^\prime,x_1^\prime x_2,x_1^\prime, x_1x_2^\prime,x_1x_2,x_1,x_2^\prime,x_2,1]\\
+			f &= [f_{11},f_{12},f_{13},f_{21},f_{22},f_{23},f_{31},f_{32},f_{33}]^T
+		\end{align*}
+
+		$a$是一对观测点$(p,p^\prime)$，$n$对点则会构成一个矩阵$D_{n \times 9}$，可构成线性方程，
+
+		\begin{equation}\label{f_matrix_eq}
+			Df = 0
+		\end{equation}
+
+		$D$称为\textbf{观测矩阵}，一般通过特征匹配来确定，在SfM中属于已知量。\\
+
+	\subsubsection*{七点法}
+
+		一对点构造一个方程，所以7对点即可精准求解除$F$，称为\textbf{七点法}。\\
+
+		$f$的通解为
+		$$
+			f = \lambda f_1 + \mu f_2
+		$$
+
+		$F$是一个齐次向量，尺度不重要，可归一化为，
+		
+		$$
+			f = \lambda f_1 + (1-\lambda) f_2
+		$$
+
+		以及，
+		$$
+			F = \lambda F_1 + \mu F_2
+		$$
+
+		其中$f_1,f_2$是矩阵$D$零空间的两个基向量（$D$有7个自由度，所以零空间维度为2），$F_1,F_2$为$f_1,f_2$对应的非0矩阵。\\
+
+		因为$F$的秩为2，因此，$\det(F) = 0$，所以
+
+		$$
+			\det(\lambda F_1 + (1-\lambda) F_2) = 0
+		$$
+
+		注意$f_1,f_2,F_1,F_2$都是确定的，上面行列式展开便可求出$\lambda$，从而求出$F$。\\
+
+		但上式展开是一个关于$\lambda$的三次函数，会得到三个根，需要排除复根和相机后面的点，从而得出正确的解。
+
+	\subsubsection*{八点法}	
+		\textbf{七点法}虽能准确求解基础矩阵，但运算过程是麻烦的，并且在实际中数据会存在噪音，只用7个点得到的解也会存在噪音。\\
+
+		所以通常考虑多于7对点来确定基础矩阵，比如\textbf{八点法}。\\
+
+		此时，方程（\ref{f_matrix_eq}）是超定的，可转变为最小化问题，
+		$$
+			\min \Vert Df\Vert^2 ,\quad s.t. \quad \Vert f\Vert = 1
+		$$
+
+		这个问题变得很简单，$f$就是$D$作奇异值分解后，右奇异矩阵的最后一列。
+
 	\subsection*{点线对应}
 
 		$p^{\prime}$在极线$l^{\prime}$上，而$p^\prime \mathbf{F} p=0$，可知，
@@ -91,9 +169,9 @@
 
 	基础矩阵描述了点之间的约束关系，每个点对应一条极线。\\
 
-	极点$e^\prime$也在极线$l^\prime$上，
+	极点$e^\prime$在所有极线$l^\prime$上，故，
 	$$
-		{e^\prime}^T l^\prime = 0 \Rightarrow {e^\prime}^TFp=0 \Rightarrow p^T F^T e^\prime = 0
+		{e^\prime}^T l^\prime = 0 \Rightarrow {e^\prime}^TFp=0 
 	$$
 
 	因为$p$的任意性，可知
@@ -116,7 +194,7 @@
 		从$N_d$中截取出左上角$3\times 3$的矩阵便是旋转矩阵，右上角$3\times 1$的向量是平移向量，这在各种工具中非常容易实现。
 
 \section{外参恢复}\label{section_recovery_outer_p}
-	基础矩阵$F$包含了相机的内外参数，如果相机内参数和$F$已知，能否从$F$中分离出外参数？\\
+	基础矩阵$F$包含了相机的内外参数，如果相机内参已知，能否从$F$中分离出外参？\\
 
 	$$
 		\mathbf{F} = {K^{\prime}}^{-T}[T]_{\times}RK^{-1} \Rightarrow {K^{\prime}}^{T}\mathbf{F} K = [T]_{\times}R = \mathbf{E}
