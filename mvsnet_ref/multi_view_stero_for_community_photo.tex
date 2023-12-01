@@ -1,0 +1,90 @@
+%-*- coding: UTF-8 -*-
+\documentclass[hpyerref,UTF8,a4paper,titlepage,12pt,oneside]{ctexbook}
+\usepackage{hyperref}
+\usepackage{geometry}
+\usepackage{xeCJK, fontspec, xunicode, xltxtra,ulem}
+\usepackage{amsthm}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{mathrsfs}
+\usepackage{mathtools}
+\usepackage{commath}
+\usepackage{listings}
+\usepackage{float}
+\usepackage{xcolor}
+\usepackage{mdframed}
+
+\graphicspath{{images/}}
+\geometry{a4paper,bottom=2cm}
+
+\title{Multi-View Stereo for Community Photo Collections}
+\author{陈国庆}
+\date{\today}
+
+\bibliography{plain}
+
+% 定理结构
+\theoremstyle{definition}
+\newtheorem{definition}{定义}[section]
+\newtheorem{theorem}{定理}[section]
+\newtheorem{corollary}{推论}[theorem]
+\newtheorem{lemma}[theorem]{Lemma}
+\renewcommand\qedsymbol{$\blacksquare$}
+
+\begin{document}
+
+% \maketitle
+\tableofcontents
+
+\href{https://hhoppe.com/mvscpc.pdf}{"Multi-View Stereo for Community Photo Collections"}是一篇2007年的文章，是稠密重建领域的经典文章，很多MVS都参考其思想。\\
+
+MVS可以粗略分成两个阶段：视图匹配（View Matching）和区域生长（Regin Growing），本文关注的是视图匹配的工作；而区域生长则借用了他人的一个框架，这里并没有说的很细。\\
+
+\subsection{背景}
+在2007年是互联网开始迅猛发展，诞生了Flickr这种UGC图片网站，不同用户会对着同一建筑物在不同的时间、用不同的相机进行拍照，能否用这种照片重建出三维场景？\\
+
+传统的MVS对拍照有很高的要求，比如多张照片要光照一致，相机间基线也有要求，但对UGC内容显然无法满足这些要求，其重建难度会更大。\\
+
+仔细分析，UGC内容带来的最大的困难时图像匹配，只要匹配好，区域生长过程沿用之前算法也还ok，所以本文重点是聚焦在图像匹配上。\\
+
+MVS需要知道相机内参，Flickr上的照片需携带EXIF，作者用\textbf{PTLens}这个商业软件抽取内参信息。\\
+
+\subsection{View Selection}
+
+图像匹配分为两个过程，
+\begin{itemize}
+	\item \textbf{Global View Selection} 从\textbf{视图}视角选择$N$个邻居
+	\item \textbf{Local View Selection} 从\textbf{像素}视角选择$N$个邻居
+\end{itemize}
+
+\subsubsection*{Global View Selection}
+	全局选择注意考虑到两张图片的视差要合理，我们知道视差太小会放大深度误差，视察过大会导致遮挡，所以视察\textbf{合适}的图片称为pair重建出的深度才可信。\\
+
+	当然在特征匹配的时候用的基本都是SIFT特征，本文也不例外。但很多SIFT匹配很好的视图点也不适合重，比如
+	\begin{itemize}
+		\item 视图过于相似，比如都拍摄某个场景的局部，信息增益差
+		\item SIFT的尺度不变可以匹配不同分辨率的图像，但分辨率差距太大的图像不适合重建
+	\end{itemize}
+
+	怎样的视察才是\textbf{合适}的呢？本文给出一个打分函数，
+	$$
+		g_R(V) = \sum_{f\in F_V \cap F_R}w_N(f)\cdot w_s(f)
+	$$
+
+	$R$是参考图像，$V$是邻域视图，$F_V,F_R$是视图$V,R$对应的SIFT特征集合，
+
+	$$
+		w_N(f) = \prod_{V_i,V_j\in N\atop s.t. i\ne j}w_\alpha(f,V_i,V_j)
+	$$
+
+	其中，
+	$$
+		w_\alpha(f,V_i,V_j) =\min((\alpha/\alpha_{max})^2,1)
+	$$
+
+	$\alpha$是两个视图相机光心与特征$f$对应3D点的夹角，$\alpha_{max} = 10^\circ$是阈值，作者认为$10^\circ$是一个理想值。\\
+
+	要注意到平方项，如果$\alpha < 10^\circ$，平方会使得$\alpha/\alpha_{max}$迅速变小，从而乘法更小的视差；如果$\alpha/\alpha_{max}$
+
+\bibliography{math}
+\end{document}

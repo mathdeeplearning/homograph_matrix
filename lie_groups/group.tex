@@ -1,0 +1,102 @@
+\section{群}
+
+$G$是一个集合，在$G$上定义\textit{群乘法}（$\cdot$），$G$及对应的乘法（$\cdot$）满足下面4个条件，则称$(G,\cdot)$为群，
+
+\begin{itemize}
+	\item \textbf{封闭性}，$g\cdot h \in G,\quad \forall g,h \in G$
+	\item \textbf{结合律}，$g\cdot(h\cdot k) = (g\cdot h)\cdot k$
+	\item \textbf{单位元}，$\exists e\in G$，$g\cdot e = e\cdot g = g,\quad \forall g \in G$
+	\item \textbf{逆元}，$\exists g^{-1} \in G$，使得$g\cdot g^{-1} = e, g^{-1}\cdot g = e,\quad \forall g \in G$
+\end{itemize}
+
+群定义不要求满足\textit{交换律}，群乘法（$\cdot$）通常可以省略，$g\cdot h$记为$gh$，$(G,\cdot)$记为 $G$。\\
+
+把$\mathbb{R}$作为一个集合，群乘法定义为实数加法，则$(\mathbb{R},+)$构成一个群；若把群乘法定义为实数乘法，则无法构成群，因为0没有逆元。\\
+
+这里一定要清楚，无论群元是什么类型，群上只定义了一种运算，就是群乘法，对群$(\mathbb{R},+)$而言，除了加法其他实数运算都跟群没有关系。
+
+\subsubsection*{\textbf{一般线性群}$GL(n)$}
+$$
+	GL(n) = \left\lbrace A \in M_{n\times n}|\det(A) \ne 0\right\rbrace
+$$
+是定义在$\mathbb{R}$上的，$n$阶可逆矩阵的集合，群乘法定义为矩阵乘法。
+
+\subsubsection*{\textbf{特殊正交群}$SO(n)$}
+
+$$
+	SO(n) = \left\lbrace R \in M_{n\times n}|RR^T = 1,\det(R) =1\right\rbrace
+$$
+是单位旋转矩阵的集合，$SO(2),SO(3)$对应二维及三维旋转矩阵。
+
+\subsubsection*{\textbf{特殊欧式群}$SE(3)$}
+	通常通过齐次坐标，将旋转、平移用一个$4\times 4$矩阵来表示，
+	$$
+		T = \begin{bmatrix}
+		R_{3\times 3} &\quad \mathbf{v}_{3\times 1}\\
+		\mathbf{0}_{1\times 3} &\quad 1
+		\end{bmatrix}
+	$$
+	其中$R \in SO(3)$是一个旋转矩阵，$\mathbf{v}$是一个平移向量，很明显$T$是可逆的，所以$T \in GL(4)$，因为其形式特殊又称为$SE(3)$或，特殊欧式群。\\
+
+	群乘法依然定义为矩阵乘法，可以验证该定义封闭。
+
+\subsubsection*{群同态}
+	群同态是两个群之间保群乘法的映射，具体来说，映射$\pi$
+	$$
+		\phi: G \mapsto G^\prime
+	$$
+	满足
+	$$
+		\phi(gh) = \phi(g)\phi(h)
+	$$
+
+	比如，$G$为$n\times n$矩阵集合，群乘法定义为矩阵相乘；$G^\prime = \mathbb{R}$，$\phi$为取行列式运算，根据线性代数可知，
+	$$
+		\det(AB) = \det(A)\det(B)
+	$$
+
+	所以$\det$是$G$与$\mathbb{R}$之间的同态映射。\\
+
+	同态映射构造了两个群乘法之间的对应关系，可以借助$G$中的操作构造$G^\prime$中的操作。\\
+
+	比如说，向量空间$V$与某群$G^\prime$之间存在同态映射$\phi$，如何在$G^\prime$上定义微小增量呢？\\
+
+	我们知道在向量空间$V$上定义增量为$x + dx$，可借助同态映射$\phi$，
+	$$
+		\phi(x+dx) = \phi(x)\phi(dx)
+	$$
+
+	来完成$G^\prime$上增量定义。\\
+
+	实际上，李群导数正是借助李代数与李群之间的同态映射构造增量求解导数，这个映射为指数映射。
+
+\subsubsection*{群同构}
+	如果同态映射是一一的且是满的，相当于存在逆映射，则称两个群同构。\\
+
+	比如$SO(2)$，为2D平面旋转矩阵群，群员可表示为，
+	$$
+		A(\theta) = \begin{bmatrix}
+			\cos\theta &\quad -\sin\theta\\
+			\sin\theta &\quad \cos\theta
+		\end{bmatrix}
+	$$
+
+	定义映射，
+	$$
+		f: SO(2) \mapsto \mathbb{R}
+	$$
+
+	$$
+		f(A(\theta)) = \theta
+	$$
+
+	根据旋转矩阵的性质容易验证，$f$是同态映射，并且旋转矩阵与$\theta$是一一对应的，所以$SO(2)$与$\mathbb{R}$同构。\\
+
+	从结构上来讲，两个群同构则认为二者“完全相同”，比如旋转角$\theta$与旋转矩阵是一回事。\\
+
+	对固定的$g\in G$，定义映射，
+	$$
+		\phi(h) = ghg^{-1}
+	$$
+
+	容易验证这个映射是$G\mapsto G$的同构，称为\textbf{伴随同构}。
